@@ -1,6 +1,6 @@
 =head1 NAME
 
-SQL::SyntaxModel::API_C - Describe the core C API for SQL::SyntaxModel
+SQL::SyntaxModel::API_C - Describe the API for a C version of SQL::SyntaxModel
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -185,7 +185,6 @@ instead of C.
 			/* Note: if it would be better, we may combine all at* into one longer union list */
 		sqlsm_dt_node_atnm  p_node_atnm; /* name of at_nodes attribute which is our primary parent */
 		sqlsm_dt_container* container  ; /* (ref) what Container this Node lives in, if any */
-		sqlsm_dt_flag       links_recip; /* true when actual refs in at_nodes are recipricated */
 		sqlsm_dt_node_dll*  child_nodes; /* (list of refs) recipr to Nodes whose at_nodes ref to us */
 	} sqlsm_dt_node;
 

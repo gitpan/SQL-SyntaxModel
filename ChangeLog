@@ -1,3 +1,61 @@
+2004-09-13   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.42.
+
+	* New code file versions are: SyntaxModel.pm v0.42, en.pm v0.14.
+
+	* Updated, corrected, and cleaned up several blocks of documentation in
+	SyntaxModel.pm: STRUCTURE, BUGS, CAVEATS, SEE ALSO.  In Language.pod, these
+	blocks were similarly worked on: the 'routine_type' enumerated type
+	description, the NODE TYPES introduction, a 'user' Node type comment.
+
+	* Changed the NAME of API_C.pod from "Describe the core C API for
+	SQL::SyntaxModel" to "Describe the API for a C version of
+	SQL::SyntaxModel".
+
+	* This release is primarily a module design simplification, consisting of
+	the removal of the distinct "At Home" Node evolution state; now there are
+	only 2 distinct states, "Alone" and "Well Known".  The two remaining states
+	have identical semantics to before, but there is now no intermediate state
+	where a Node can both be in a container and not be return-linked to by
+	other Nodes that it links to.  For all practical purposes, you can now just
+	use the "Alone" state where you may have used "At Home" before, which is
+	when an in-construction Node shouldn't have its existence known to the rest
+	of the system.  All related changes were made in SyntaxModel.pm and en.pm,
+	unless otherwise stated.  Further details of this change are listed next.
+
+	* The method add_reciprocal_links() has had its functionality merged into
+	the method put_in_container(); likewise, remove_reciprocal_links() has been
+	merged into take_from_container().  The method are_reciprocal_links() was
+	simply removed, since whether or not get_container() returns a value now
+	has the same implications the removed method had.  There were 3 messages in 
+	en.pm for those methods that were merged or removed.
+
+	* Removed the 'links_recip' Node property, which is no longer needed.  Also
+	removed the sqlsm_dt_node member 'links_recip' in the API_C.pod docs.  Any
+	SyntaxModel.pm code which consulted the now-removed property when deciding
+	to do something now consults whether the Node is in a Container instead.
+
+	* Updated set_node_ref_attribute() and _clear_node_ref_attribute() to remove 
+	one test and simplify two others; one en.pm message was removed.
+
+	* The method move_before_sibling() had one input test updated and two others 
+	merged; in en.pm, 3 messages were merged or removed.
+
+	* Updated Node.assert_deferrable_constraints() to simplify a conditional.
+
+	* Updated all documentation references to Node states and "At Home" to
+	remove and adjust for the missing intermediate state.  Most updates were
+	in: SYNOPSIS, NODE EVOLUTION STATES, and several method descriptions.
+
+	* Updated t_SQL_SyntaxModel.pm to remove two add_reciprocal_links() calls.
+
+	* Between the above changes, the file set had about 5K shaved from it.
+
+	* Due to the removal of the *_reciprocal_links() methods, this release is
+	not backwards compatible with any code that invoked them, which is
+	basically all of it; to fix this, just remove or replace the invocations.
+
 2004-09-09   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.41.

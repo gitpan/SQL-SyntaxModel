@@ -13,7 +13,6 @@ sub make_a_node {
 	my $node = $model->new_node( $node_type );
 	$node->set_node_id( $model->get_next_free_node_id( $node_type ) );
 	$node->put_in_container( $model );
-	$node->add_reciprocal_links();
 	return( $node );
 }
 
@@ -23,7 +22,6 @@ sub make_a_child_node {
 	my $node = $pp_node->new_node( $node_type );
 	$node->set_node_id( $container->get_next_free_node_id( $node_type ) );
 	$node->put_in_container( $container );
-	$node->add_reciprocal_links();
 	$node->set_node_ref_attribute( $pp_attr, $pp_node );
 	$node->set_parent_node_attribute_name( $pp_attr );
 	return( $node );

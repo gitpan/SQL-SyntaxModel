@@ -852,14 +852,6 @@ but your choice of type can severely limit what kinds of arguments you can
 take.  Only some routine types, functions mainly, can return a value.  Only some
 routine types have names.
 
-I<Up to and including the 2004-08-31 SQL::SyntaxModel v0.40 release, there was
-an additional routine_type called ANONYMOUS, which was intended to be used for
-all routines that were children of 'application' Nodes, while PROCEDURE and
-FUNCTION would only be used as children of 'schema' Nodes (or be nested).  As
-of SQL::SyntaxModel v0.41, the distinct ANONYMOUS routine type has gone away,
-while PROCEDURE and FUNCTION will now assume any differing behaviour necessary
-when they are children of 'application'.>
-
 	PACKAGE   - an Oracle package; a namespace beneath a schema for related funcs and procs
 	TRIGGER   - a trigger on a table or schema view
 	PROCEDURE - a named stored procedure, under a schema|package|app|other-rtn
@@ -1253,15 +1245,8 @@ constraints all have a mudi-name of 'primary'.  All "Distinct Child Groups
 List" constraints are deferrable and can only be tested on "Well Known" Nodes.
 
 The B<Example List> is a list of example Nodes for the Node type, formatted
-like a table, one row per Node, one column per attribute.
-
-I<Starting with SQL::SyntaxModel as of 2004-02-04, the order that the Nodes
-appear in is significant; previously it wasn't, since there were extra
-attributes (removed as of 2004-02-04) which stored important sequence numbers. 
-If these same Nodes were stored in an RDBMS, then extra columns may need to be
-added to remember their sequence, which an RDBMS does not natively do. 
-Whereas, if the Nodes were stored in XML format, you won't need to add
-anything, as XML preserves order.>
+like a table, one row per Node, one column per attribute.  Note that the order
+in which "Example List" rows/Nodes appear is significant.
 
 =head2 root
 
@@ -2866,14 +2851,14 @@ Attribute List:
 	password - L.cstr - the password this user provides when authenticating themself
 	default_schema - N.schema - this user's default schema; unqualified object references look here
 
-	Note: In other words to the above, all user types *except* ANONYMOUS have a user name and password.
-
 Local Attribute Dependencies List:
 
 	user_type:
 		match_owner - SCHEMA_OWNER - MA
 		name - ROOT,SCHEMA_OWNER,DATA_EDITOR - MA
 		password - ROOT,SCHEMA_OWNER,DATA_EDITOR - MA
+
+	Note: In other words to the above, all user types *except* ANONYMOUS have a user name and password.
 
 Distinct Child Groups List:
 

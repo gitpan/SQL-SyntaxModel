@@ -10,7 +10,7 @@ package SQL::SyntaxModel::L::en;
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 ######################################################################
 
@@ -199,10 +199,6 @@ my %text_strings = (
 		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
 		"invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and it does not match the Id of any '{EXPNTYPE}' Node in this Container",
-	'SSM_N_SET_NREF_AT_RECIP_LINKS' => 
-		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"invalid ATTR_VALUE argument; the given Node is not yet ".
-		"in reciprocating status, so this current Node can not yet become a child of it",
 	'SSM_N_SET_NREF_AT_CIRC_REF' => 
 		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
 		"invalid ATTR_VALUE argument; that Node is a direct ".
@@ -275,33 +271,20 @@ my %text_strings = (
 		"because the Node attribute named '{ATNM}' expects to link to a '{EXPNTYPE}' Node ".
 		"with a Node Id of '{EXPNID}', but no such Node exists in the given Container",
 
-	'SSM_N_TF_CONT_RECIP_LINKS' => 
+	'SSM_N_TF_CONT_HAS_CHILD' => 
 		"$CN.take_from_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"this Node can not be taken from its Container yet ".
-		"as other Nodes that this Node refers to in its attributes have reciprocal links to it",
+		"this Node can not be taken from its Container yet because it has child Nodes of its own",
 
-	'SSM_N_ADD_RL_NO_NODE_ID' => 
-		"$CN.add_reciprocal_links(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"this Node is not in a Container, so no other Nodes can link to it as a child",
-
-	'SSM_N_REM_RL_HAS_CHILD' => 
-		"$CN.remove_reciprocal_links(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"this Node has child Nodes of its own, so it can not be removed from reciprocating status",
-
-	'SSM_N_MOVE_PRE_SIB_NO_RL' => 
+	'SSM_N_MOVE_PRE_SIB_NO_CONT' => 
 		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"this Node is not in reciprocating ".
-		"status and therefore it is not present in any child list; it has no siblings",
+		"this Node is not in a Container and therefore ".
+		"it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_NO_S_ARG' => 
 		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
 		"missing SIBLING argument",
 	'SSM_N_MOVE_PRE_SIB_BAD_S_ARG' => 
 		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
 		"invalid SIBLING argument; it is not a Node object, but rather is '{ARG}'",
-	'SSM_N_MOVE_PRE_SIB_S_NO_RL' => 
-		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
-		"invalid SIBLING argument; that Node is not in reciprocating ".
-		"status and therefore it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_S_DIFF_CONT' => 
 		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
 		"invalid SIBLING argument; that Node is not in ".

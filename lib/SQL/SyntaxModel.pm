@@ -10,7 +10,7 @@ package SQL::SyntaxModel;
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Locale::KeyedText 0.07;
 
@@ -126,11 +126,9 @@ my $NPROP_P_NODE_ATNM = 'p_node_atnm'; # str (enum) - name of AT_NREFS elem havi
 	# C version of this will be an enumerated value.
 	# Since a Node of one type may have a parent Node of multiple possible types, 
 	# this tells us not only which type but which instance it is.
-	# This property will be undefined if either there is no parent or the parent is a pseudo-node.
+	# This property will be undefined if either there is no parent or the parent is a pseudo-Node.
 my $NPROP_CONTAINER   = 'container'; # ref to Container this Node lives in
 	# C version of this would be a pointer to a Container struct
-my $NPROP_LINKS_RECIP = 'links_recip'; # boolean - false by def, true when our actual refs in AT_NREFS are reciprocated
-	# C version of this will be an integer used like a boolean.
 my $NPROP_CHILD_NODES = 'child_nodes'; # array - list of refs to other Nodes having actual refs to this one
 	# We use this to reciprocate actual refs from the AT_NREFS property of other Nodes to us.
 	# When converting to XML, we only render once, beneath the Node which we refer to in our P_NODE_ATNM.
@@ -140,7 +138,7 @@ my $NPROP_CHILD_NODES = 'child_nodes'; # array - list of refs to other Nodes hav
 	# however, when rendering to XML, we only render a Node once, and not as many times as linked; 
 	# it is also possible that we may never be put in this situation from real-world usage.
 	# Note that in the above situation, a normalized child list would have the above two links sitting 
-	# adjacent to each other; add_reciprocal_links() will do this, but subsequent calls to 
+	# adjacent to each other; put_in_container() will do this, but subsequent calls to 
 	# set_node_ref_attribute() might not.  In the interest of simplicity, any method that wants to 
 	# change the order of a child list should also normalize any multiple same-child occurrances.
 
@@ -279,7 +277,7 @@ my $TPI_MUDI_ATGPS   = 'mudi_atgps'; # Array of groups of mutually distinct attr
 		# 3. an array ref with 0..N elements that are names of enum child-node-attrs; 
 		# 4. an array ref with 0..N elements that are names of nref child-node-attrs.
 
-# Names of special "pseudo-nodes" that are used in an XML version of this structure.
+# Names of special "pseudo-Nodes" that are used in an XML version of this structure.
 my $SQLSM_L1_ROOT_PSND = 'root';
 my $SQLSM_L2_ELEM_PSND = 'elements';
 my $SQLSM_L2_BLPR_PSND = 'blueprints';
@@ -1733,7 +1731,6 @@ sub new {
 	$node->{$NPROP_AT_NREFS} = {};
 	$node->{$NPROP_P_NODE_ATNM} = undef;
 	$node->{$NPROP_CONTAINER} = undef;
-	$node->{$NPROP_LINKS_RECIP} = 0;
 	$node->{$NPROP_CHILD_NODES} = [];
 
 	return( $node );
@@ -1806,7 +1803,7 @@ sub set_node_id {
 	$rh_cnl_ft->{$new_id} = $node; # temp reserve new+old
 	$node->{$NPROP_NODE_ID} = $new_id; # change self from old to new
 	delete( $rh_cnl_ft->{$old_id} ); # now only new reserved
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 
@@ -1845,7 +1842,7 @@ sub clear_literal_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_literal_attribute_type( $attr_name ); # dies if bad arg
 	delete( $node->{$NPROP_AT_LITERALS}->{$attr_name} );
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -1853,7 +1850,7 @@ sub clear_literal_attribute {
 sub clear_literal_attributes {
 	my ($node) = @_;
 	$node->{$NPROP_AT_LITERALS} = {};
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -1888,7 +1885,7 @@ sub set_literal_attribute {
 	} else {} # $exp_lit_type eq 'cstr' or 'misc'; no change to value needed
 
 	$node->{$NPROP_AT_LITERALS}->{$attr_name} = $attr_value;
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -1932,7 +1929,7 @@ sub clear_enumerated_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_enumerated_attribute_type( $attr_name ); # dies if bad arg
 	delete( $node->{$NPROP_AT_ENUMS}->{$attr_name} );
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -1940,7 +1937,7 @@ sub clear_enumerated_attribute {
 sub clear_enumerated_attributes {
 	my ($node) = @_;
 	$node->{$NPROP_AT_ENUMS} = {};
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -1956,7 +1953,7 @@ sub set_enumerated_attribute {
 	}
 
 	$node->{$NPROP_AT_ENUMS}->{$attr_name} = $attr_value;
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2000,7 +1997,7 @@ sub clear_node_ref_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_node_ref_attribute_type( $attr_name ); # dies if bad arg
 	$node->_clear_node_ref_attribute( $attr_name );
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2010,7 +2007,7 @@ sub clear_node_ref_attributes {
 	foreach my $attr_name (sort keys %{$node->{$NPROP_AT_NREFS}}) {
 		$node->_clear_node_ref_attribute( $attr_name );
 	}
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2018,8 +2015,8 @@ sub clear_node_ref_attributes {
 sub _clear_node_ref_attribute {
 	my ($node, $attr_name) = @_;
 	my $attr_value = $node->{$NPROP_AT_NREFS}->{$attr_name} or return( 1 ); # no-op; attr not set
-	if( ref($attr_value) eq ref($node) and $node->{$NPROP_LINKS_RECIP} ) {
-		# The attribute value is a Node object, and that Node has linked back, so clear that link.
+	if( ref($attr_value) eq ref($node) ) {
+		# The attribute value is a Node object, so clear its link back.
 		my $ra_children_of_parent = $attr_value->{$NPROP_CHILD_NODES};
 		foreach my $i (0..$#{$ra_children_of_parent}) {
 			if( $ra_children_of_parent->[$i] eq $node ) {
@@ -2076,10 +2073,6 @@ sub set_node_ref_attribute {
 		}
 	}
 
-	if( ref($attr_value) eq ref($node) and !$attr_value->{$NPROP_LINKS_RECIP} ) {
-		$node->_throw_error_message( 'SSM_N_SET_NREF_AT_RECIP_LINKS' );
-	}
-
 	if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) and
 			$attr_value eq $node->{$NPROP_AT_NREFS}->{$attr_name} ) {
 		return( 1 ); # no-op; new attribute value same as old
@@ -2098,11 +2091,11 @@ sub set_node_ref_attribute {
 
 	$node->_clear_node_ref_attribute( $attr_name ); # clears any existing link through this attribute
 	$node->{$NPROP_AT_NREFS}->{$attr_name} = $attr_value;
-	if( ref($attr_value) eq ref($node) and $node->{$NPROP_LINKS_RECIP} ) {
-		# The attribute value is a Node object, and that Node should link back now, so do it.
+	if( ref($attr_value) eq ref($node) ) {
+		# The attribute value is a Node object, so that Node should link back now.
 		push( @{$attr_value->{$NPROP_CHILD_NODES}}, $node );
 	}
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2226,7 +2219,7 @@ sub get_parent_node {
 sub clear_parent_node_attribute_name {
 	my ($node) = @_;
 	$node->{$NPROP_P_NODE_ATNM} = undef;
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2256,7 +2249,7 @@ sub set_parent_node_attribute_name {
 		}
 	}
 	$node->{$NPROP_P_NODE_ATNM} = $attr_name;
-	if( $node->{$NPROP_LINKS_RECIP} ) {
+	if( $node->{$NPROP_CONTAINER} ) {
 		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
@@ -2343,90 +2336,56 @@ sub put_in_container {
 	$node->{$NPROP_CONTAINER} = $new_container;
 	$node->{$NPROP_AT_NREFS} = \%at_nodes_refs;
 	$rh_cnl_bt->{$node_type}->{$node_id} = $node;
-	# We don't get referenced nodes to link back here; caller requests that separately
+
+	# Now get our parent Nodes to link back to us.
+	if( my $p_pseudonode = $NODE_TYPES{$node_type}->{$TPI_P_PSEUDONODE} ) {
+		push( @{$new_container->{$CPROP_PSEUDONODES}->{$p_pseudonode}}, $node );
+	}
+	foreach my $attr_value (values %{$node->{$NPROP_AT_NREFS}}) {
+		push( @{$attr_value->{$NPROP_CHILD_NODES}}, $node );
+	}
 
 	# Now adjust our "next free node id" counter if appropriate
 	my $rh_cnfni = $node->{$NPROP_CONTAINER}->{$CPROP_NEXT_FREE_NIDS};
 	if( $node_id >= $rh_cnfni->{$node_type} ) {
 		$rh_cnfni->{$node_type} = 1 + $node_id;
 	}
+
+	$new_container->{$CPROP_DEF_CON_TESTED} = 0; # A Node has become "Well Known".
 }
 
 sub take_from_container {
 	my ($node) = @_;
 	my $container = $node->{$NPROP_CONTAINER} or return( 1 ); # no-op; node is already not in a container
 
-	if( $node->{$NPROP_LINKS_RECIP} ) {
-		$node->_throw_error_message( 'SSM_N_TF_CONT_RECIP_LINKS' );
-	}
-
-	my $node_id = $node->{$NPROP_NODE_ID};
-	my $node_type = $node->{$NPROP_NODE_TYPE};
-	my $rh_at_nodes_refs = $node->{$NPROP_AT_NREFS};
-
-	my %at_nodes_nids = (); # values put in here will be node id numbers
-	foreach my $at_nodes_atnm (keys %{$rh_at_nodes_refs}) {
-		# We need to make sure that when an attribute value is cleared, its key is deleted
-		$at_nodes_nids{$at_nodes_atnm} = $rh_at_nodes_refs->{$at_nodes_atnm}->{$NPROP_NODE_ID};
-	}
-
-	delete( $node->{$NPROP_CONTAINER}->{$CPROP_ALL_NODES}->{$node_type}->{$node_id} );
-	$node->{$NPROP_AT_NREFS} = \%at_nodes_nids;
-	$node->{$NPROP_CONTAINER} = undef;
-}
-
-######################################################################
-
-sub are_reciprocal_links {
-	# A true value just means any links we may make will reciprocate;
-	# we may not actually have any links yet.
-	return( $_[0]->{$NPROP_LINKS_RECIP} );
-}
-
-sub add_reciprocal_links {
-	my ($node) = @_;
-	$node->{$NPROP_LINKS_RECIP} and return( 1 ); # no-op; links are already reciprocated
-
-	my $container = $node->{$NPROP_CONTAINER};
-	unless( $container ) {
-		$node->_throw_error_message( 'SSM_N_ADD_RL_NO_NODE_ID' );
-	}
-
-	my $node_type = $node->{$NPROP_NODE_TYPE};
-	if( my $p_pseudonode = $NODE_TYPES{$node_type}->{$TPI_P_PSEUDONODE} ) {
-		push( @{$container->{$CPROP_PSEUDONODES}->{$p_pseudonode}}, $node );
-	}
-
-	foreach my $attr_value (values %{$node->{$NPROP_AT_NREFS}}) {
-		push( @{$attr_value->{$NPROP_CHILD_NODES}}, $node );
-	}
-
-	$node->{$NPROP_LINKS_RECIP} = 1;
-	$container->{$CPROP_DEF_CON_TESTED} = 0; # A Node has become "Well Known".
-}
-
-sub remove_reciprocal_links {
-	my ($node) = @_;
-	$node->{$NPROP_LINKS_RECIP} or return( 1 ); # no-op; links are already not reciprocated
-
 	if( @{$node->{$NPROP_CHILD_NODES}} > 0 ) {
-		$node->_throw_error_message( 'SSM_N_REM_RL_HAS_CHILD' );
+		$node->_throw_error_message( 'SSM_N_TF_CONT_HAS_CHILD' );
 	}
 
+	# Remove our parent Nodes' links back to us.
 	my $node_type = $node->{$NPROP_NODE_TYPE};
 	if( my $p_pseudonode = $NODE_TYPES{$node_type}->{$TPI_P_PSEUDONODE} ) {
 		my $container = $node->{$NPROP_CONTAINER};
 		my $siblings = $container->{$CPROP_PSEUDONODES}->{$p_pseudonode};
 		@{$siblings} = grep { $_ ne $node } @{$siblings}; # remove all occurances
 	}
-
 	foreach my $attr_value (@{$node->{$NPROP_AT_NREFS}}) {
 		my $siblings = $attr_value->{$NPROP_CHILD_NODES};
 		@{$siblings} = grep { $_ ne $node } @{$siblings}; # remove all occurances
 	}
 
-	$node->{$NPROP_LINKS_RECIP} = 0;
-	$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node is gone.
+	my $rh_at_nodes_refs = $node->{$NPROP_AT_NREFS};
+	my %at_nodes_nids = (); # values put in here will be node id numbers
+	foreach my $at_nodes_atnm (keys %{$rh_at_nodes_refs}) {
+		# We need to make sure that when an attribute value is cleared, its key is deleted
+		$at_nodes_nids{$at_nodes_atnm} = $rh_at_nodes_refs->{$at_nodes_atnm}->{$NPROP_NODE_ID};
+	}
+
+	delete( $container->{$CPROP_ALL_NODES}->{$node_type}->{$node->{$NPROP_NODE_ID}} );
+	$node->{$NPROP_AT_NREFS} = \%at_nodes_nids;
+	$node->{$NPROP_CONTAINER} = undef;
+
+	$container->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node is gone.
 		# Turn on tests because this Node's absence affects *other* Well Known Nodes.
 }
 
@@ -2438,14 +2397,13 @@ sub move_before_sibling {
 
 	# First make sure we have 3 actual Nodes that are all "Well Known" and in the same Container.
 
-	$node->{$NPROP_LINKS_RECIP} or $node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_NO_RL' );
+	$node->{$NPROP_CONTAINER} or $node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_NO_CONT' );
 
 	defined( $sibling ) or $node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_NO_S_ARG' );
 	unless( ref($sibling) eq ref($node) ) {
 		$node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_BAD_S_ARG', { 'ARG' => $sibling } );
 	}
-	$sibling->{$NPROP_LINKS_RECIP} or $node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_S_NO_RL' );
-	unless( $sibling->{$NPROP_CONTAINER} eq $node->{$NPROP_CONTAINER} ) {
+	unless( $sibling->{$NPROP_CONTAINER} and $sibling->{$NPROP_CONTAINER} eq $node->{$NPROP_CONTAINER} ) {
 		$node->_throw_error_message( 'SSM_N_MOVE_PRE_SIB_S_DIFF_CONT' );
 	}
 
@@ -2544,14 +2502,12 @@ sub add_child_nodes {
 sub assert_deferrable_constraints {
 	my ($node) = @_;
 	# Only "Well Known" Nodes would get this invoked by Container.assert_deferrable_constraints().
-	# "Alone","At Home" Nodes only get here when Node.assert_deferrable_constraints() 
+	# "Alone" Nodes only get here when Node.assert_deferrable_constraints() 
 	# is invoked directly by external code.
-	$node->_assert_in_node_deferrable_constraints(); # can call on Alone, At Home, Well Known
+	$node->_assert_in_node_deferrable_constraints(); # can call on Alone, Well Known
 	if( $node->{$NPROP_CONTAINER} ) {
-		if( $node->{$NPROP_LINKS_RECIP} ) {
-			$node->_assert_child_comp_deferrable_constraints(
-				undef, $node->get_child_nodes() ); # call on Well Known only
-		}
+		$node->_assert_child_comp_deferrable_constraints(
+			undef, $node->get_child_nodes() ); # call on Well Known only
 	}
 }
 
@@ -2566,7 +2522,7 @@ sub _assert_in_node_deferrable_constraints {
 	# 1.1: Assert that the NODE_ID attribute is set.
 	unless( defined( $node->{$NPROP_NODE_ID} ) ) {
 		# This can only possibly fail at deferrable-constraint assertion time with "Alone" Nodes; 
-		# it is always-enforced for "At Home" and "Well Known" Nodes.
+		# it is always-enforced for "Well Known" Nodes.
 		$node->_throw_error_message( 'SSM_N_ASDC_NID_VAL_NO_SET' );
 	}
 
@@ -2944,7 +2900,6 @@ included.)  However, here are a few example usage lines:
 		my $dom_entity_id = SQL::SyntaxModel->new_node( 'domain' );
 		$dom_entity_id->set_node_id( 1 );
 		$dom_entity_id->put_in_container( $model );
-		$dom_entity_id->add_reciprocal_links();
 		$dom_entity_id->set_node_ref_attribute( 'schema', $schema );
 		$dom_entity_id->set_parent_node_attribute_name( 'schema' );
 		$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
@@ -2955,7 +2910,6 @@ included.)  However, here are a few example usage lines:
 		my $tb_person = $pp_node->new_node( 'table' );
 		$tb_person->set_node_id( 1 );
 		$tb_person->put_in_container( $model );
-		$tb_person->add_reciprocal_links();
 		$tb_person->set_node_ref_attribute( 'schema', $schema );
 		$tb_person->set_parent_node_attribute_name( 'schema' );
 		$tb_person->set_literal_attribute( 'name', 'person' );
@@ -2964,7 +2918,6 @@ included.)  However, here are a few example usage lines:
 		my $tbc_person_id = $pp_node->new_node( 'table_col' );
 		$tbc_person_id->set_node_id( 1 );
 		$tbc_person_id->put_in_container( $model );
-		$tbc_person_id->add_reciprocal_links();
 		$tbc_person_id->set_node_ref_attribute( 'table', $tb_person );
 		$tbc_person_id->set_parent_node_attribute_name( 'table' );
 		$tbc_person_id->set_literal_attribute( 'name', 'person_id' );
@@ -3426,9 +3379,9 @@ between an XML DOM and an object-relational database, with a specific schema.
 This module is implemented with two main classes that work together, Containers
 and Nodes. The Container object is an environment or context in which Node
 objects usually live.  A typical application will only need to create one
-Container object (returned by the module's 'new' function), and then a set of
-Nodes which live within that Container.  The Nodes are related sometimes with
-single or multiple cardinality to each other.
+Container object (returned by the module's 'new_container' function), and then
+a set of Nodes which live within that Container.  The Nodes are related
+sometimes with single or multiple cardinality to each other.
 
 SQL::SyntaxModel is expressly designed so that its data is easy to convert
 between different representations, mainly in-memory data structures linked by
@@ -3455,14 +3408,12 @@ Node is a child of the first.  The order of child Nodes under a parent is the
 same as that in which the parent-child relationship was assigned, unless you 
 have afterwards used the move_before_sibling() method to change this.
 
-I<In versions of SQL::SyntaxModel prior to the 2004-02-04 release, some Node
-types also had explicit 'order' attributes so that if each Node was converted
-as-is to an RDBMS record, it would be possible to retrieve the records in the
-same sequence; this was useful in cases where the order of Nodes was important.
-These redundant 'order' attributes were eliminated as of 2004-02-04 since their
-maintenance was making this module more difficult to use.  As a consequence,
-you will now have to add a column yourself to maintain the sort order when
-converting Nodes to RDBMS records.>
+The order of child Nodes under a parent is often significant, so it is
+important to preserve this sequence explicitly if you store a Node set in an
+RDBMS, since databases do not consider record order to be significant or worth
+remembering; you would add extra columns to store sequence numbers.  You do not
+have to do any extra work when storing Nodes in XML, however, because XML does
+consider node order to be significant and will preserve it.
 
 When SQL::SyntaxModels are converted to XML, one referencing attribute is given
 higher precedence than the others and becomes the single parent XML node.  For
@@ -3474,12 +3425,12 @@ Node of the same type as itself, or of a specific other type as its parent,
 depending on the context; these Nodes form trees of their own type, and it is
 the root Node of each tree which has a different Node type as its parent. 
 
-Finally, any Node of certain types will always have a specific pseudo-node as
+Finally, any Node of certain types will always have a specific pseudo-Node as
 its single parent, which it does not reference in an attribute, and which can
-not be changed.  All 6 pseudo-nodes have no attributes, even 'id', and only one
+not be changed.  All 6 pseudo-Nodes have no attributes, even 'id', and only one
 of each exists; they are created by default with the Container they are part
 of, forming the top 2 levels of the Node tree, and can not be removed.  They
-are: 'root' (the single level-1 Node which is parent to the other pseudo-nodes
+are: 'root' (the single level-1 Node which is parent to the other pseudo-Nodes
 but no normal Nodes), 'elements' (parent to 'domain' Nodes), 'blueprints'
 (parent to 'catalog' and 'application' Nodes), 'tools' (parent to
 'data_storage_product' and 'data_link_product' Nodes), 'sites' (parent to
@@ -3497,7 +3448,7 @@ allowed inputs or constraints to said methods.  With only simple guidance in
 SyntaxModel.pm, you should be able to interpret Language.pod to get all the
 nitty gritty details.  You should also look at the tutorial or example files
 which will be in the distribution when ready.  You could also learn something
-from the code samples inside other modules which sub-class this one.
+from the code in or with other modules which sub-class or use this one.
 
 =head1 FAULT TOLERANCE AND MULTI-THREADING SUPPORT
 
@@ -3572,12 +3523,14 @@ course, if you know a clean way around this, I would be happy to hear it.>
 
 =head1 NODE EVOLUTION STATES
 
-A SQL::SyntaxModel Node object always exists in one of 3 official ordered
+A SQL::SyntaxModel Node object always exists in one of 2 official ordered
 states (which can conceptually be divided further into more states).  For now
-we can call them "Alone" (1), "At Home" (2), and "Well Known" (3).  (Hey, that
-rhymes!)  The set of legal operations you can perform on a Node are different
-depending on its state, and a Node can only transition between
-adjacent-numbered states one at a time.
+we can call them "Alone" (1) and "Well Known" (2).  The set of legal operations
+you can perform on a Node are different depending on its state, and a Node can
+only transition between adjacent-numbered states one at a time.
+
+I<Note: Up to 2004.09.13 there was a third state, "At Home", that was part way 
+between "Alone" and "Well Known", but it was removed on that date.>
 
 When a new Node is created, using new_node(), it starts out "Alone"; it does
 *not* live in a Container, and it is illegal to have any actual (Perl)
@@ -3593,26 +3546,17 @@ will be garbage collected like any Perl variable when your own reference to it
 goes away.
 
 When you invoke the put_in_container() method on an "Alone" Node, giving it a
-Container object as an argument, the Node will transition to the "At Home"
-state; you can move from "At Home" to "Alone" using the complementary
-take_from_container() method.  An "At Home" Node lives in a Container, and any
-attributes which refer to other Nodes now must be actual references, where the
-existence of the other Node in the same Container is confirmed.  If any
+Container object as an argument, the Node will transition to the "Well Known"
+state; you can move from "Well Known" to "Alone" using the complementary
+take_from_container() method.  An "Well Known" Node lives in a Container, and
+any attributes which refer to other Nodes now must be actual references, where
+the existence of the other Node in the same Container is confirmed.  If any
 conceptual references are set in a Node while it is "Alone", these will be
 converted into actual references by put_in_container(), which will fail if any
-can't be found.  take_from_container() will replace references with Node Ids. A
-Node can only link to a Node in the same Container as itself.  While a Node in
-"At Home" status can link to other Nodes, those Nodes can not link back to an
-"At Home" Node in their own child list; from their point of view, the "At Home"
-Node doesn't exist.  In addition, an "At Home" Node can not have children of 
-its own; it can not be referenced by any other Nodes.
-
-When you invoke the add_reciprocal_links() method on an "At Home" Node, the
-Node will transition to the "Well Known" state; any other Nodes that this one
-references will now link back to it in their own child lists.  The
-complementary remove_reciprocal_links() method will break those return links
-and transition a "Well Known" Node to an "At Home" one.  A "Well Known" Node 
-is also allowed to have children of its own.
+can't be found; any other Nodes that this one references will now link back to
+it in their own child lists.  The method take_from_container() will replace
+references with Node Ids, and remove the parent-to-child references.  A Node
+can only link to a Node in the same Container as itself.
 
 Testing for the existence of mandatory Node attribute values is separate from 
 the official Node state and can be invoked on a Node at any time.  None of the 
@@ -3735,7 +3679,7 @@ an empty (but still blessed) Perl hash.  I<See the CAVEATS documentation.>
 
 This "getter" method returns a reference to one of this Container's member
 Nodes, which has a Node Type of NODE_TYPE, and a Node Id of NODE_ID.  You may
-not request a pseudo-node (it doesn't actually exist).
+not request a pseudo-Node (it doesn't actually exist).
 
 =head2 get_child_nodes([ NODE_TYPE ])
 
@@ -3786,13 +3730,12 @@ both individually and collectively; it throws an exception if it can find
 anything wrong.  Note that a failure with any one Node will cause the testing
 of the whole set to abort, as the offending Node throws an exception which this
 method doesn't catch; any untested Nodes could also have failed, so you will
-have to re-run this method after fixing the problem.  This method ignores any
-"At Home" Nodes in this Container, and runs its collective tests as if they
-didn't exist.  This method will short-circuit and not perform any tests if this
-Container's "deferrable constraints are tested" property is true, so to avoid
-unnecessary repeated tests due to redundant external invocations; this allows
-you to put validation checks for safety everywhere in your program while
-avoiding a corresponding performance hit.
+have to re-run this method after fixing the problem.  This method will
+short-circuit and not perform any tests if this Container's "deferrable
+constraints are tested" property is true, so to avoid unnecessary repeated
+tests due to redundant external invocations; this allows you to put validation
+checks for safety everywhere in your program while avoiding a corresponding
+performance hit.
 
 =head1 NODE CONSTRUCTOR FUNCTIONS AND METHODS
 
@@ -3821,10 +3764,9 @@ to it be garbage collected.
 =head1 NODE OBJECT METHODS
 
 These methods are stateful and may only be invoked off of Node objects.  For
-some of these, it doesn't matter whether the Node is in a Container or not, nor
-whether its links to other Nodes are reciprocated or not.  For others, one or
-both of these conditions must be true or false for the method to be invoked, or
-it will throw an exception (like for bad input).
+some of these, it doesn't matter whether the Node is in a Container or not. 
+For others, this condition must be true or false for the method to be invoked,
+or it will throw an exception (like for bad input).
 
 =head2 delete_node()
 
@@ -3955,8 +3897,8 @@ Node is in a Container, and Id numbers if it isn't.
 =head2 clear_node_ref_attribute( ATTR_NAME )
 
 This "setter" method will clear this Node's node attribute named in the
-ATTR_NAME argument.  If the other Node being referred to has a reciprocal 
-link to the current one in its child list, that will also be cleared.
+ATTR_NAME argument; the other Node being referred to will also have its child
+list reciprocal link to the current Node cleared.
 
 =head2 clear_node_ref_attributes()
 
@@ -3968,9 +3910,9 @@ the clear_node_ref_attribute() documentation for the semantics.
 This "setter" method will set or replace this Node's node attribute named in
 the ATTR_NAME argument, giving it the new value specified in ATTR_VALUE (if it
 is different).  If the attribute was previously valued, this method will first
-invoke clear_node_ref_attribute() on it.  When setting a new value, if the current
-Node is in a Container and expects Nodes it links to reciprocate, then it will
-also add the current Node to the other Node's child list.
+invoke clear_node_ref_attribute() on it.  When setting a new value, if the
+current Node is in a Container, then it will also add the current Node to the
+other Node's child list.
 
 =head2 set_node_ref_attributes( ATTRS )
 
@@ -4070,28 +4012,13 @@ any.
 =head2 put_in_container( NEW_CONTAINER )
 
 This "setter" method will put the current Node into the Container given as the
-NEW_CONTAINER argument if it can, which moves the Node from "Alone" to "At
-Home" status.
+NEW_CONTAINER argument if it can, which moves the Node from "Alone" to "Well
+Known" status.
 
 =head2 take_from_container()
 
 This "setter" method will take the current Node from its Container if it can,
-which moves the Node from "At Home" to "Alone" status.
-
-=head2 are_reciprocal_links()
-
-This "getter" method returns a true boolean value if the current Node is in
-"Well Known" status, and false otherwise.
-
-=head2 add_reciprocal_links()
-
-This "setter" method will move the current Node from "At Home" to "Well Known"
-status if possible.
-
-=head2 remove_reciprocal_links()
-
-This "setter" method will move the current Node from "Well Known" to "At Home"
-status if possible.
+which moves the Node from "Well Known" to "Alone" status.
 
 =head2 move_before_sibling( SIBLING[, PARENT] )
 
@@ -4148,13 +4075,13 @@ performed; "Well Known" Nodes get all the tests, while "Alone" Nodes skip some.
 The following 3 "getter" methods can be invoked either on Container or Node
 objects, and will return a tree-arranged structure having the contents of a
 Node and all its children (to the Nth generation).  The previous statement
-assumes that all the 'children' have a true are_reciprocal_links property,
-which means that a Node's parent is aware of it; if that property is false for
-a Node, the assumption is that said Node is still being constructed, and
-neither it nor its children will be included in the output.  If you invoke the
-3 methods on a Node, then that Node will be the root of the returned structure.
-If you invoke them on a Container, then a few pseudo-nodes will be output with
-all the normal Nodes in the Container as their children.
+assumes that all the 'children' are in the same Container, which means that a
+Node's parent is aware of it; if a child is not in the Container, the
+assumption is that said Node is still being constructed, and neither it nor its
+children will be included in the output.  If you invoke the 3 methods on a
+Node, then that Node will be the root of the returned structure. If you invoke
+them on a Container, then a few pseudo-Nodes will be output with all the normal
+Nodes in the Container as their children.
 
 =head2 get_all_properties()
 
@@ -4276,9 +4203,9 @@ parent of a NODE_TYPE Node.
 =head2 node_types_with_pseudonode_parents([ NODE_TYPE ])
 
 This function by default returns a Hash ref where the keys are the names of the
-Node Types whose primary parents can only be pseudo-nodes, and where the values
-name the pseudo-nodes they are the children of; if the optional NODE_TYPE
-argument is given, it just returns the pseudo-node for that Node Type.
+Node Types whose primary parents can only be pseudo-Nodes, and where the values
+name the pseudo-Nodes they are the children of; if the optional NODE_TYPE
+argument is given, it just returns the pseudo-Node for that Node Type.
 
 =head2 mandatory_node_type_literal_attribute_names( NODE_TYPE[, ATTR_NAME] )
 
@@ -4305,18 +4232,14 @@ is always-mandatory.
 
 This module is currently in pre-alpha development status, meaning that some
 parts of it will be changed in the near future, perhaps in incompatible ways;
-however, I believe that the largest short-term changes are already done.  This
-module will indeed execute and do a variety of things, but it isn't yet
-recommended for any kind of serious use.  The current state is analagous to
-'developer releases' of operating systems; you can study it with the intent of
-using it in the future, but you should hold off writing any volume of code
-against it which you aren't prepared to rewrite later as the API changes.  Also,
-the module hasn't been tested as much as I would like, but it has tested the
-more commonly used areas.  All of the code included with the other modules that
-sub-class this one has been executed, which tests most internal functions and
-data.  All of this said, I plan to move this module into alpha development
-status within the next few releases, once I start using it in a production
-environment myself.
+however, I believe that any further incompatible changes will be small.  The
+current state is analagous to 'developer releases' of operating systems; it is
+reasonable to being writing code that uses this module now, but you should be
+prepared to maintain it later in keeping with API changes.  This module also
+does not yet have full code coverage in its tests, though the most commonly
+used areas are covered.  All of this said, I plan to move this module into
+alpha development status within the next few releases, once I start using it in
+a production environment myself.
 
 =head1 CAVEATS
 
@@ -4324,19 +4247,16 @@ All SQL::SyntaxModel::Container objects contain circular references by design
 (or more specifically, when 1 or more Node is in one).  When you are done with
 a Container object, you should explicitly call its "destroy()" method prior to
 letting your references to it go out of scope, or you will leak the memory it
-used.  I<Up to and including SQL::SyntaxModel's 2004-03-03 release I had
-implemented a cludge that wrapped the actual Container object in a second
-object that would automatically destroy its contents when it went out of scope.
- While that saved users from doing manual destruction, it introduced
-potentially worse problems, such as the Container being destroyed too early
-(and it added complexity regardless); as of 2004-03-08 I did away with the
-cludge.>
+used.  Note that some early versions of SQL::SyntaxModel had wrapped the actual
+Container object in a second object that was auto-destroyed when it went out of
+scope, but this cludge was later removed due to adding worse problems than it
+solved, such as Containers being destroyed too early.
 
 =head1 SEE ALSO
 
 perl(1), SQL::SyntaxModel::L::en, SQL::SyntaxModel::Language,
 SQL::SyntaxModel::API_C, Locale::KeyedText, Rosetta,
-Rosetta::Utility::SQLBuilder, Rosetta::Engine::Generic,
+Rosetta::Utility::SQLBuilder, Rosetta::Utility::SQLParser,
 SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID, DBI, SQL::Statement,
 SQL::Translator, SQL::YASP, SQL::Generator, SQL::Schema, SQL::Abstract,
 SQL::Snippet, SQL::Catalog, DB::Ent, DBIx::Abstract, DBIx::AnyDBD,
