@@ -319,7 +319,7 @@ another of the same type (eg: a sub-query or sub-routine).
 				<catalog_link c="M" />
 				<view c="M" r="Y" />
 				<routine c="M" r="Y" />
-				<command c="M" r="Y" />
+				<command c="M" />
 			</application>
 		</blueprints>
 		<tools>
@@ -360,6 +360,7 @@ another of the same type (eg: a sub-query or sub-routine).
 	<view c="M" r="Y">
 		<view_arg c="M" />
 		<view_src c="M">
+			<view_src_arg c="M" />
 			<view_src_col c="M" />
 		</view_src>
 		<view_col c="M" />
@@ -374,7 +375,7 @@ another of the same type (eg: a sub-query or sub-routine).
 		<view c="M" r="Y" />
 		<routine_arg c="M" />
 		<routine_var c="M" />
-		<routine_stmt c="M" r="Y">
+		<routine_stmt c="M">
 			<routine_expr c="M" r="Y" />
 		</routine_stmt>
 	</routine>
@@ -1093,21 +1094,34 @@ of that type, including what the attribute means and what major+minor type it
 is.  For each Node Type, its attributes appear in a list; each attribute is
 described by one (possibly 'wrapped') line, in this format:
 
-	<attr-name> - <major-type>.<minor-type>[ - <mandatory-flag>] - <description>
+	<attr-name> - <major-type>.<minor-type>[ - <parent-flag>][ - <mandatory-flag>] - <description>
 
 In the above usage, the major-type is shortened from its full name like this:
 "literal" -> "L", "enumerated" -> "E", "node_ref" -> "N".  When the major-type
 is "node_id", then "NODE_ID" appears in place of the combined major and minor
 types on the line.
 
+The parent-flag indicates whether the attribute can be used to link the current
+Node to a "primary parent" Node.  When a Container (or subset of its Nodes) is
+converted to a tree-like representation (such as XML), each Node will be output
+beneath its primary parent.  For each Node, it is mandatory for exactly one
+primary parent candidate attribute to be set, and the others not set (unless
+the Node type has no candidate attributes).  The flag says "PP".
+
 The mandatory-flag indicates whether the attribute is mandatory.  If it is
 absent, then the attribute is optional under all local (considering only that
 same Node and not other Nodes) circumstances.  If the flag says "MA", then the
-attribute must be populated (not be null) in all circumstances; in some cases,
-it means you explicitly provide a 'default' value such as zero.  If the flag
-says "MC(...)" then the attribute is only mandatory when the other attribute
-named in the parenthesis is populated, or if the expression in the parenthesis
-is true.
+attribute must always be populated (not be null); in some cases, it means you
+explicitly provide a 'default' value such as zero.  If the flag says
+"MC[EE|R](...)" then the attribute is only sometimes mandatory.  A flag of
+"MCEE(foo=bar[|baz...])" means that the attribute is mandatory only when
+another, same-Node enumerated attribute named in the parenthesis (left side of
+'=') equals one of the values given in the parenthesis (right side of '=').  A
+flag of "MCR(foo)" only applies to Node types that can have parent Nodes of the
+same type, arranged in a tree; the attribute named in the parenthesis is null
+if the current Node is a root of its tree (could be of one element), and it is
+set when it is not a root; an MCR attribute must be set when the Node is a
+root, and it must not be set when the Node is not a root.
 
 Note that for for any Node Type that has an attribute of 'name', that attribute
 is often one and the same thing as the 'identifier' in SQL; eg, a table 'name'
@@ -1190,7 +1204,7 @@ schema owner.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog - MA - the catalog that this user is in
+	catalog - N.catalog - PP - MA - the catalog that this user is in
 
 Unique Constraint List:
 
@@ -1229,8 +1243,8 @@ schema name, one is using a partially qualified name.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog - the schema in this blueprint may use the unrealized catalog link
-	application - N.application - the routines in this app bp may use the unrealized catalog link
+	catalog - N.catalog - PP - the schema in this blueprint may use the unrealized catalog link
+	application - N.application - PP - the routines in this app bp may use the unrealized catalog link
 	name - L.cstr - MA - the "catalog link" that is the front of the fully qualified remote schema object name
 	target - N.catalog - MA - this is what the link connects to
 
@@ -1263,7 +1277,7 @@ anyway, if practical.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog - MA - the catalog that this schema/namespace is in
+	catalog - N.catalog - PP - MA - the catalog that this schema/namespace is in
 	name - L.cstr - MA - the name this schema/namespace is identified by
 	owner - N.owner - MA - the user that owns this schema
 
@@ -1288,7 +1302,7 @@ user privileges.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog - MA - the catalog that this role is in
+	catalog - N.catalog - PP - MA - the catalog that this role is in
 	name - L.cstr - MA - the name this role is identified by
 
 Unique Constraint List:
@@ -1307,7 +1321,7 @@ privilege_for Nodes, which are children of the privilege_on Node.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	role - N.role - MA - the role that this privilege is granted to
+	role - N.role - PP - MA - the role that this privilege is granted to
 	schema - N.schema - if the privilege relates to a whole schema, this is the schema
 	domain - N.domain - if the privilege type is domain-related, this is the domain
 	sequence - N.sequence - if the privilege type is sequence-related, this is the sequence
@@ -1326,7 +1340,7 @@ that is defined by this Node's privilege_on parent Node.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	priv_on - N.privilege_on - MA - what "privilege_on" Node this option is associated with
+	priv_on - N.privilege_on - PP - MA - what "privilege_on" Node this option is associated with
 	priv_type - E.privilege_type - MA - what manner of privilege this is
 
 Unique Constraint List:
@@ -1366,23 +1380,23 @@ store_fixed attribute to true.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	schema - N.schema - MA - the schema that this domain is in
+	schema - N.schema - PP - MA - the schema that this domain is in
 	name - L.cstr - MA - the name this domain (user customized data type) is identified by
 	base_type - E.simple_data_type - MA - name of the base data type this data_type is customized from
 	num_precision - L.uint - max length in digits for exact number, or count of significant digits for inexact 
 	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the radix point
 	num_octets - L.uint - for integral or inexact (floating point) numbers, fixed storage size in octets
 	num_unsigned - L.bool - for numbers, true means only values >= 0 may be stored
-	max_octets - L.uint - MC(base_type=STR_BIT) - maximum size in octets for a binary/bit string
-	max_chars - L.uint - MC(base_type=STR_CHAR) - maximum size in characters for a character string
+	max_octets - L.uint - MCEE(base_type=STR_BIT) - maximum size in octets for a binary/bit string
+	max_chars - L.uint - MCEE(base_type=STR_CHAR) - maximum size in characters for a character string
 	store_fixed - L.bool - when true then try to reserve max size on disk even if not all used
-	char_enc - E.char_enc_type - MC(base_type=STR_CHAR) - which character encoding to use
+	char_enc - E.char_enc_type - MCEE(base_type=STR_CHAR) - which character encoding to use
 	trim_white - L.bool - when true then trim lead/trailing whitespace on save into STR_CHAR field/var
 	uc_latin - L.bool - do we uppercase latin chars in STR_CHAR before writing (no change on reading)
 	lc_latin - L.bool - do we lowercase latin chars in STR_CHAR before writing (no change on reading)
 	pad_char - L.cstr - when store_fixed is true then pad actual value with this to max size on save
 	trim_pad - L.bool - when store_fixed is true then trim padding on read from STR_CHAR field/var
-	calendar - E.calendar - MC(base_type=DATM_FULL,DATM_DATE) - what calendar the date and time (or date only) is in
+	calendar - E.calendar - MCEE(base_type=DATM_FULL|DATM_DATE) - what calendar the date and time (or date only) is in
 	with_zone - L.sint - if timestamp/time to include a 'with time zone', this says what time zone
 	range_min - L.misc - when applicable, what the allowed minimum value is (for bounds/check constraint)
 	range_max - L.misc - when applicable, what the allowed maximum value is (for bounds/check constraint)
@@ -1434,7 +1448,7 @@ SQL NULL (undefined) value is always distinct from anything in this option list.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	domain - N.domain - MA - what "domain" Node this option is associated with
+	domain - N.domain - PP - MA - what "domain" Node this option is associated with
 	value - L.misc - MA - this is the actual enumerated value that the domain_opt Node represents
 
 Unique Constraint List:
@@ -1460,7 +1474,7 @@ standards.  The standard says that only integers can be produced by sequences.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	schema - N.schema - MA - the schema that this sequence generator is in
+	schema - N.schema - PP - MA - the schema that this sequence generator is in
 	name - L.cstr - MA - the name this sequence generator is identified by
 	increment - L.sint - the interval between sequence numbers; defaults to 1 if not set
 	min_val - L.sint - the minimum value that the sequence can generate; no minimum if not set
@@ -1485,7 +1499,7 @@ constraints for data integrity.  SQL-2003,1999 calls this a "base table".
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	schema - N.schema - MA - the schema that this table is in
+	schema - N.schema - PP - MA - the schema that this table is in
 	name - L.cstr - MA - the name this table is identified by
 
 Unique Constraint List:
@@ -1510,7 +1524,7 @@ specific to that column.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	table - N.table - MA - unique identifier for this table
+	table - N.table - PP - MA - unique identifier for this table
 	name - L.cstr - MA - unique identifier for column within table
 	domain - N.domain - MA - the user-customized data type for this column
 	mandatory - L.bool - MA - true means col value is mandatory (not null constr), false if not (null)
@@ -1565,10 +1579,10 @@ no table indexes qualify then the table has no primary key.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	table - N.table - MA - unique identifier for this table
+	table - N.table - PP - MA - unique identifier for this table
 	name - L.cstr - MA - unique identifier for index within table
 	ind_type - E.table_index_type - MA - what type of index this is (eg: UNIQUE, FOREIGN)
-	f_table - N.table - MC(ind_type=FOREIGN|UFOREIGN) - foreign key constraining table
+	f_table - N.table - MCEE(ind_type=FOREIGN|UFOREIGN) - foreign key constraining table
 
 Unique Constraint List:
 
@@ -1600,7 +1614,7 @@ table columns are involved in each table index.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	table_ind - N.table_ind - MA - unique identifier for index within table
+	table_ind - N.table_ind - PP - MA - unique identifier for index within table
 	table_col - N.table_col - MA - unique identifier for column within table
 	f_table_col - N.table_col - when the index type is a foreign key, this is the constraining column
 
@@ -1692,13 +1706,13 @@ Attribute List:
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	view_context - E.view_context - MA - what context this view expects to live in; eg: schema, cursor, application
 	view_type - E.view_type - MA - what kind of view this is; eg: match, single, mult, compound, has-subq, recursive
-	schema - N.schema - MC(view_context=SCHEMA) - the schema that this view is in, if any
+	schema - N.schema - PP - MCEE(view_context=SCHEMA) - the schema that this view is in, if any
 	name - L.cstr - MA - the name this view is identified by, if any
-	application - N.application - MC(view_context=APPLIC) - if view in app space, not app routine, an app is our parent
-	routine - N.routine - MC(view_context=ROUTINE) - parent view of this one, if any; empty if this is the root view
-	p_view - N.view - MC(view_context=INSIDE) - parent view of this one, if any; empty if this is the root view
+	application - PP - N.application - MCEE(view_context=APPLIC) - if view in app space, not app routine, an app is our parent
+	routine - PP - N.routine - MCEE(view_context=ROUTINE) - parent view of this one, if any; empty if this is the root view
+	p_view - PP - N.view - MCEE(view_context=INSIDE) - parent view of this one, if any; empty if this is the root view
 	match_all_cols - L.bool - use with view_type=MATCH; if true, this view matches every col; if false, view_col has list
-	c_merge_type - E.compound_operator - MC(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
+	c_merge_type - E.compound_operator - MCEE(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
 	may_write - L.bool - true when we should at least try allowing updates through the view
 
 Unique Constraint List:
@@ -1729,7 +1743,7 @@ app bind var.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view - N.view - MA - what named sub-query view this is an argument for
+	view - N.view - PP - MA - what named sub-query view this is an argument for
 	name - L.cstr - MA - name of the argument
 	domain - N.domain - MA - the user-customized data type for this argument
 
@@ -1748,7 +1762,7 @@ would be a unique alias for it.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view - N.view - MA - unique identifier for view
+	view - N.view - PP - MA - unique identifier for view
 	name - L.cstr - MA - unique "alias" identifier for source within view
 	match_table - N.table - if set, the source is a table (and match_view must not be set)
 	match_view - N.view - if set, the source is another view (and match_table must not be set)
@@ -1785,7 +1799,7 @@ used in a "from" clause.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	src - N.view_src - MA - which view source this column is associated with
+	src - N.view_src - PP - MA - which view source this column is associated with
 	match_view_arg - N.view_arg - MA - which argument in the source view is represented
 
 Unique Constraint List:
@@ -1800,7 +1814,7 @@ this view, as specified in the view_src table.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	src - N.view_src - MA - which view source this column is associated with
+	src - N.view_src - PP - MA - which view source this column is associated with
 	match_table_col - N.table_col - which column from the source table is represented, if applicable
 	match_view_col - N.view_col - which column from the source view is represented, if applicable
 
@@ -1853,7 +1867,7 @@ the data comes from or goes to) is not described here.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view - N.view - MA - what view this column is a result/interface for
+	view - N.view - PP - MA - what view this column is a result/interface for
 	name - L.cstr - MA - unique identifier for column within view
 	domain - N.domain - MA - the user-customized data type for this column
 	src_col - N.view_src_col - simply match this src col rather than defining with a view_expr
@@ -1908,7 +1922,7 @@ other source, which in many databases is illegal.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view - N.view - unique identifier for this view
+	view - N.view - PP - MA - unique identifier for this view
 	lhs_src - N.view_src - MA - which view source is on the left side of the join
 	rhs_src - N.view_src - MA - which view source is on the right side of the join
 	join_type - E.join_operator - MA - what kind of table/view join is being done
@@ -1939,7 +1953,7 @@ of source columns (one from each source) that are being matched.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	join - N.view_join - MA - which view join this column is associated with
+	join - N.view_join - PP - MA - which view join this column is associated with
 	lhs_src_col - N.view_src_col - MA - which column from the left source is being matched on
 	rhs_src_col - N.view_src_col - MA - which column from the right source is being matched on
 
@@ -1968,13 +1982,13 @@ as a way of invoking Oracle-style "start-with connect-by" tersely.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view - N.view - MA - what view this has a part in defining
+	view - N.view - PP - MA - what view this has a part in defining
 	start_src_col - N.view_src_col - MA - which source column is checked against to determine the root of the hierarchy
 	start_expr_type - E.basic_expr_type - MA - use this to determine source of value to compare start_src_col against
-	start_lit_val - L.misc - MC(start_expr_type=LIT) - if start_src_col is being compared to a literal, then store the literal value here
-	start_view_arg - N.view_arg - MC(start_expr_type=VARG) - if the current view is a subquery, read value of an argument to it
-	start_routine_arg - N.routine_arg - MC(start_expr_type=ARG) - the current routine argument to read the value of
-	start_routine_var - N.routine_var - MC(start_expr_type=VAR) - the current routine variable to read the value of
+	start_lit_val - L.misc - MCEE(start_expr_type=LIT) - if start_src_col is being compared to a literal, then store the literal value here
+	start_view_arg - N.view_arg - MCEE(start_expr_type=VARG) - if the current view is a subquery, read value of an argument to it
+	start_routine_arg - N.routine_arg - MCEE(start_expr_type=ARG) - the current routine argument to read the value of
+	start_routine_var - N.routine_var - MCEE(start_expr_type=VAR) - the current routine variable to read the value of
 	conn_src_col - N.view_src_col - MA - which source column contains a record's own identifier against which children match
 	p_conn_src_col - N.view_src_col - MA - which source column contains the value of a parent identifier
 
@@ -2020,24 +2034,24 @@ Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	expr_type - E.basic_expr_type - MA - what type of expression this is; eg: literal, column, subq call, function call
-	p_expr - N.view_expr - parent expression of this one, if any; empty if this is the root expression
-	view - N.view - MC(!p_expr) - what view this expression has a part in defining
-	view_part - E.view_part - MC(!p_expr) - what "part" of a view definition this is defining
-	view_col - N.view_col - MC(view_part=RESULT|INTO) - the view interface/result column we are defining the value of
-	set_view_col - N.view_src_col - MC(view_part=SET) - this is the column we are setting the value of in insert or update op
-	view_src_arg - N.view_src_arg - MC(view_part=FROM) - arg of named subquery used in "from" we are passing value to
-	lit_val - L.misc - MC(expr_type=LIT) - the literal value of this expression
-	src_col - N.view_src_col - MC(expr_type=COL) - the source table/view column to read the value of
-	match_col - N.view_col - MC(expr_type=MCOL) - ref res col inst of src col; only MATCH views can in "where", all cn [hv,ord]
-	view_arg - N.view_arg - MC(expr_type=VARG) - if the current view is a subquery, read value of an argument to it
-	routine_arg - N.routine_arg - MC(expr_type=ARG) - the current routine argument to read the value of
-	routine_var - N.routine_var - MC(expr_type=VAR) - the current routine variable to read the value of
-	domain - N.domain - MC(expr_type=CAST) - cast single child expression into this data type / domain
-	sequence - N.sequence - MC(expr_type=SEQN) - the sequence generator we will get the "next" value for
-	call_view - N.view - MC(expr_type=CVIEW) - the view/subquery we will invoke; subquery is child of cont view
+	p_expr - N.view_expr - PP - parent expression of this one, if any; empty if this is the root expression
+	view - N.view - PP - MCR(p_expr) - what view this expression has a part in defining
+	view_part - E.view_part - MCR(p_expr) - what "part" of a view definition this is defining
+	view_col - N.view_col - MCEE(view_part=RESULT|INTO) - the view interface/result column we are defining the value of
+	set_view_col - N.view_src_col - MCEE(view_part=SET) - this is the column we are setting the value of in insert or update op
+	view_src_arg - N.view_src_arg - MCEE(view_part=FROM) - arg of named subquery used in "from" we are passing value to
+	lit_val - L.misc - MCEE(expr_type=LIT) - the literal value of this expression
+	src_col - N.view_src_col - MCEE(expr_type=COL) - the source table/view column to read the value of
+	match_col - N.view_col - MCEE(expr_type=MCOL) - ref res col inst of src col; only MATCH views can in "where", all cn [hv,ord]
+	view_arg - N.view_arg - MCEE(expr_type=VARG) - if the current view is a subquery, read value of an argument to it
+	routine_arg - N.routine_arg - MCEE(expr_type=ARG) - the current routine argument to read the value of
+	routine_var - N.routine_var - MCEE(expr_type=VAR) - the current routine variable to read the value of
+	domain - N.domain - MCEE(expr_type=CAST) - cast single child expression into this data type / domain
+	sequence - N.sequence - MCEE(expr_type=SEQN) - the sequence generator we will get the "next" value for
+	call_view - N.view - MCEE(expr_type=CVIEW) - the view/subquery we will invoke; subquery is child of cont view
 	call_view_arg - N.view_arg - if parent expr set call_view, name view arg that curr expr passes value to
-	call_sfunc - E.standard_func - MC(expr_type=SFUNC) - the standard built-in function we will invoke
-	call_ufunc - N.routine - MC(expr_type=UFUNC) - the user-defined stored function we are calling
+	call_sfunc - E.standard_func - MCEE(expr_type=SFUNC) - the standard built-in function we will invoke
+	call_ufunc - N.routine - MCEE(expr_type=UFUNC) - the user-defined stored function we are calling
 	call_ufunc_arg - N.routine_arg - if parent expr set call_ufunc, name routine arg that curr expr passes value to
 	catalog_link - N.catalog_link - if ufunc in another catalog, say via which catalog link
 
@@ -2155,16 +2169,16 @@ Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	routine_type - E.routine_type - MA - what kind of routine this is
-	schema - N.schema - the schema that this routine is in, if any
-	application - N.application - if routine is in the application space, an app is our parent
-	p_routine - N.routine - parent routine of this one, if any; empty if this is the root routine
-	table - N.table - if this routine is a trigger on a table, then this is the table to watch
-	view - N.view - if this routine is a trigger on a named view, then this is the view to watch
+	schema - N.schema - PP - the schema that this routine is in, if any
+	application - N.application - PP - if routine is in the application space, an app is our parent
+	p_routine - N.routine - PP - parent routine of this one, if any; empty if this is the root routine
+	table - N.table - PP - if this routine is a trigger on a table, then this is the table to watch
+	view - N.view - PP - if this routine is a trigger on a named view, then this is the view to watch
 	name - L.cstr - MA - name routine ident by in a [schema, p_routine, app], or name of trigger
-	return_var_type - E.basic_var_type - if this routine returns a value, this is its variable type
-	return_domain - N.domain - if this routine returns a value, this is its domain
-	trigger_event - E.basic_trigger_event - MC(routine_type=TRIGGER) - when a trigger executes
-	trigger_per_row - L.bool - MC(routine_type=TRIGGER) - true, exec each row, false, each stmt
+	return_var_type - E.basic_var_type - MCEE(routine_type=FUNCTION) - variable type of function's return value
+	return_domain - N.domain - MCEE(return_var_type=SCALAR) - domain of a function's scalar return value
+	trigger_event - E.basic_trigger_event - MCEE(routine_type=TRIGGER) - when a trigger executes
+	trigger_per_row - L.bool - MCEE(routine_type=TRIGGER) - true, exec each row, false, each stmt
 
 Unique Constraint List:
 
@@ -2178,11 +2192,11 @@ This type of Node describes an input and/or output argument variable to a routin
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	routine - N.routine - MA - what routine this argument is for
+	routine - N.routine - PP - MA - what routine this argument is for
 	name - L.cstr - MA - unique identifier for variable within view
 	var_type - E.basic_var_type - MA - what basic variable type the argument is
-	domain - N.domain - MC(var_type=SCALAR) - user customized data type of scalar arg
-	curs_view - N.view - MC(var_type=CURSOR) - put reference to the view defining this cursor here
+	domain - N.domain - MCEE(var_type=SCALAR) - user customized data type of scalar arg
+	curs_view - N.view - MCEE(var_type=CURSOR) - put reference to the view defining this cursor here
 
 Unique Constraint List:
 
@@ -2198,13 +2212,13 @@ current routine is a package, these are package-level variables.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	routine - N.routine - MA - what routine this variable is in
+	routine - N.routine - PP - MA - what routine this variable is in
 	name - L.cstr - MA - unique identifier for variable within view
 	var_type - E.basic_var_type - MA - what basic variable type the variable is
-	domain - N.domain - MC(var_type=SCALAR) - user customized data type of scalar variable
+	domain - N.domain - MCEE(var_type=SCALAR) - user customized data type of scalar variable
 	init_lit_val - L.misc - if var type is SCALAR, an initial value for var can go here
 	is_constant - L.bool - if the var type is SCALAR, this says its value may not be changed
-	curs_view - N.view - MC(var_type=CURSOR) - put the view defining cursor here
+	curs_view - N.view - MCEE(var_type=CURSOR) - put the view defining cursor here
 	curs_for_update - L.bool - if var type is SCALAR, true if select for update, false (def) if r/o
 
 Unique Constraint List:
@@ -2222,15 +2236,15 @@ in child expression Nodes.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	routine - N.routine - MA - what routine this statement is in
+	routine - N.routine - PP - MA - what routine this statement is in
 	stmt_type - E.basic_stmt_type - MA - what type of stmt this is; eg: assignment, condit, call, loop, dml, return
 	dest_arg - N.routine_arg - if the stmt type is 'assign', this 'out' arg is where the expression result goes
 	dest_var - N.routine_var - if the stmt type is 'assign', this var is where the expression result goes
-	call_sproc - E.standard_proc - MC(stmt_type=SPROC) - this is the standard built-in procedure to call
+	call_sproc - E.standard_proc - MCEE(stmt_type=SPROC) - this is the standard built-in procedure to call
 	curs_arg - N.routine_arg - if SPROC stmt that works with CURSOR, this arg may have the cursor
 	curs_var - N.routine_var - if SPROC stmt that works with CURSOR, this var may have the cursor
 	view_for_dml - N.view - if the statement is an insert/update/delete/etc (non-cursor) defined by a view, name it here
-	call_uproc - N.routine - MC(stmt_type=UPROC) - this is the user-defined stored function (routine) to call
+	call_uproc - N.routine - MCEE(stmt_type=UPROC) - this is the user-defined stored function (routine) to call
 	catalog_link - N.catalog_link - if uproc in another catalog, say via which catalog link
 	c_routine - N.routine - if the stmt type starts an unnamed routine context, this is the child routine id
 
@@ -2251,15 +2265,15 @@ Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	expr_type - E.basic_expr_type - MA - what type of expression this is; eg: literal, variable, function
-	p_stmt - N.routine_stmt - unique identifier for routine routine_stmt this expression is part of
-	p_expr - N.routine_expr - parent expression of this one, if any; empty if this is the root expression
-	lit_val - L.misc - MC(expr_type=LIT) - the literal value of this expression
-	src_arg - N.routine_arg - MC(expr_type=ARG) - the current routine argument to read the value of (or bind to if OUT arg)
-	src_var - N.routine_var - MC(expr_type=VAR) - the current routine variable to read the value of (or bind to if OUT arg)
-	domain - N.domain - MC(expr_type=CAST) - cast single child expression into this data type / domain
-	sequence - N.sequence - MC(expr_type=SEQN) - the sequence generator we will get the "next" value for
-	call_sfunc - E.standard_func - MC(expr_type=SFUNC) - the standard built-in function we will invoke
-	call_ufunc - N.routine - MC(expr_type=UFUNC) - the user-defined stored function we are calling
+	p_expr - N.routine_expr - PP - parent expression of this one, if any; empty if this is the root expression
+	p_stmt - N.routine_stmt - PP - MCR(p_expr) - unique identifier for routine routine_stmt this expression is part of
+	lit_val - L.misc - MCEE(expr_type=LIT) - the literal value of this expression
+	routine_arg - N.routine_arg - MCEE(expr_type=ARG) - the current routine argument to read the value of (or bind to if OUT arg)
+	routine_var - N.routine_var - MCEE(expr_type=VAR) - the current routine variable to read the value of (or bind to if OUT arg)
+	domain - N.domain - MCEE(expr_type=CAST) - cast single child expression into this data type / domain
+	sequence - N.sequence - MCEE(expr_type=SEQN) - the sequence generator we will get the "next" value for
+	call_sfunc - E.standard_func - MCEE(expr_type=SFUNC) - the standard built-in function we will invoke
+	call_ufunc - N.routine - MCEE(expr_type=UFUNC) - the user-defined stored function we are calling
 	call_ufunc_arg - N.routine_arg - if parent set call_ufunc/uproc, name routine arg that curr expr passes value to
 	catalog_link - N.catalog_link - if ufunc in another catalog, say via which catalog link
 
@@ -2276,7 +2290,7 @@ use these for all DDL actions, or database connect/disconnect actions.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	application - N.application - MA - what application this Command belongs to
+	application - N.application - PP - MA - what application this Command belongs to
 	name - L.cstr - the name this command (pseudo-routine) is identified by in an application, if any
 	command_type - E.command_type - MA - what SQL::SyntaxModel recognized command to run
 	command_arg - L.uint - MA - the Node ID of the argument to the above command
@@ -2407,7 +2421,7 @@ model.  Or in the first case, whether multiple catalogs should get combined.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog_instance - MA - the catalog_instance that this option customizes
+	catalog - N.catalog_instance - PP - MA - the catalog_instance that this option customizes
 	key - L.cstr - MA - this is the option key that the the external code looks for
 	value - L.misc - MA - this is the associated option value
 
@@ -2458,11 +2472,11 @@ Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	product - N.data_link_product - MA - what product implements this; determines driver to use
-	p_link - N.catalog_link_instance - parent link of this one (that which calls this), if any
-	catalog - N.catalog_instance - the schema in this instance may use the actual catalog link
-	application - N.application_instance - the routines in this app inst may use the actual catalog link
-	unrealized - N.catalog_link - MC(!p_link) - the unrealized catalog link that we are 'implementing'
-	target - N.catalog_instance - MC(!p_link) - this is what the link connects to
+	p_link - N.catalog_link_instance - PP - parent link of this one (that which calls this), if any
+	catalog - N.catalog_instance - PP - the schema in this instance may use the actual catalog link
+	application - N.application_instance - PP - the routines in this app inst may use the actual catalog link
+	unrealized - N.catalog_link - MCR(p_link) - the unrealized catalog link that we are 'implementing'
+	target - N.catalog_instance - MCR(p_link) - this is what the link connects to
 	local_dsn - L.cstr - locally known driver-specific name for the catalog link (to cat or ch prox)
 	login_user - L.cstr - if we want to spec a username to always connect with, put here; else get it at runtime
 	login_pass - L.cstr - if we always use same password, put it here; else get it at runtime
@@ -2484,7 +2498,7 @@ model or at runtime bind variables.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	link - N.catalog_link_instance - MA - the catalog_link_instance that this option customizes
+	link - N.catalog_link_instance - PP - MA - the catalog_link_instance that this option customizes
 	key - L.cstr - MA - this is the option key that the the external code looks for
 	value - L.misc - MA - this is the associated option value
 
@@ -2519,12 +2533,14 @@ schema, then it should have an additional database user for that purpose.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	catalog - N.catalog_instance - MA - the catalog_instance that this user is in
+	catalog - N.catalog_instance - PP - MA - the catalog_instance that this user is in
 	user_type - E.user_type - MA - what type of user this is; eg: schema owner vs data editor
-	match_owner - N.owner - MC(user_type=SCHEMA_OWNER) - the catalog that this user is in
-	name - L.cstr - MC(user_type<>ANONYMOUS) - the name this user is identified by, and what he authenticates himself with
-	password - L.cstr - MC(user_type<>ANONYMOUS) - the password this user provides when authenticating themself
+	match_owner - N.owner - MCEE(user_type=SCHEMA_OWNER) - the catalog that this user is in
+	name - L.cstr - MCEE(user_type=ROOT|SCHEMA_OWNER|DATA_EDITOR) - the name this user is identified by, and what he authenticates himself with
+	password - L.cstr - MCEE(user_type=ROOT|SCHEMA_OWNER|DATA_EDITOR) - the password this user provides when authenticating themself
 	default_schema - N.schema - this user's default schema; unqualified object references look here
+
+	Note: In other words to the above, all user types *except* ANONYMOUS have a user name and password.
 
 Unique Constraint List:
 
@@ -2548,7 +2564,7 @@ specific role, and the privileges that come with it.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	user - N.user - MA - the user that a role is granted to
+	user - N.user - PP - MA - the user that a role is granted to
 	role - N.role - MA - the role that is being granted
 
 Unique Constraint List:

@@ -62,6 +62,7 @@ sub create_and_populate_model {
 	$dom_pers_name->set_literal_attribute( 'name', 'person_name' );
 	$dom_pers_name->set_enumerated_attribute( 'base_type', 'STR_CHAR' );
 	$dom_pers_name->set_literal_attribute( 'max_chars', 100 );
+	$dom_pers_name->set_enumerated_attribute( 'char_enc', 'UTF8' );
 
 	# Define the table that holds our data:
 	my $tb_person = make_a_child_node( 'table', 1, $schema, 'schema' );
@@ -172,13 +173,13 @@ sub create_and_populate_model {
 	$rts_fet_open_c->set_enumerated_attribute( 'call_sproc', 'CURSOR_OPEN' );
 	my $rte_fet_open_c_a1 = make_a_child_node( 'routine_expr', 6, $rts_fet_open_c, 'p_stmt' );
 	$rte_fet_open_c_a1->set_enumerated_attribute( 'expr_type', 'VAR' );
-	$rte_fet_open_c_a1->set_node_ref_attribute( 'src_var', $rtv_fet_cursor );
+	$rte_fet_open_c_a1->set_node_ref_attribute( 'routine_var', $rtv_fet_cursor );
 	my $rts_fet_return = make_a_child_node( 'routine_stmt', 7, $rt_fetchall, 'routine' );
 	$rts_fet_return->set_enumerated_attribute( 'stmt_type', 'SPROC' );
 	$rts_fet_return->set_enumerated_attribute( 'call_sproc', 'RETURN' );
 	my $rte_fet_return_a1 = make_a_child_node( 'routine_expr', 8, $rts_fet_return, 'p_stmt' );
 	$rte_fet_return_a1->set_enumerated_attribute( 'expr_type', 'VAR' );
-	$rte_fet_return_a1->set_node_ref_attribute( 'src_var', $rtv_fet_cursor );
+	$rte_fet_return_a1->set_node_ref_attribute( 'routine_var', $rtv_fet_cursor );
 	# ... The calling code would then fetch whatever rows they want and then close the cursor
 
 	# Describe a routine that inserts a record into the 'person' table:
@@ -295,7 +296,7 @@ sub create_and_populate_model {
 	my $vwe_upd_w1 = make_a_child_node( 'view_expr', 39, $vw_updateone, 'view' );
 	$vwe_upd_w1->set_enumerated_attribute( 'view_part', 'WHERE' );
 	$vwe_upd_w1->set_enumerated_attribute( 'expr_type', 'SFUNC' );
-	$vwe_upd_w1->set_enumerated_attribute( 'sfunc', 'EQ' );
+	$vwe_upd_w1->set_enumerated_attribute( 'call_sfunc', 'EQ' );
 	my $vwe_upd_w2 = make_a_child_node( 'view_expr', 40, $vwe_upd_w1, 'p_expr' );
 	$vwe_upd_w2->set_enumerated_attribute( 'expr_type', 'COL' );
 	$vwe_upd_w2->set_node_ref_attribute( 'src_col', $vwsc_upd_pid );
@@ -328,7 +329,7 @@ sub create_and_populate_model {
 	my $vwe_del_w1 = make_a_child_node( 'view_expr', 48, $vw_deleteone, 'view' );
 	$vwe_del_w1->set_enumerated_attribute( 'view_part', 'WHERE' );
 	$vwe_del_w1->set_enumerated_attribute( 'expr_type', 'SFUNC' );
-	$vwe_del_w1->set_enumerated_attribute( 'sfunc', 'EQ' );
+	$vwe_del_w1->set_enumerated_attribute( 'call_sfunc', 'EQ' );
 	my $vwe_del_w2 = make_a_child_node( 'view_expr', 49, $vwe_del_w1, 'p_expr' );
 	$vwe_del_w2->set_enumerated_attribute( 'expr_type', 'COL' );
 	$vwe_del_w2->set_node_ref_attribute( 'src_col', $vwsc_del_pid );
@@ -462,7 +463,7 @@ sub expected_model_xml_output {
 			<owner id="1" catalog="1" />
 			<schema id="1" catalog="1" name="gene" owner="1">
 				<domain id="1" schema="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
-				<domain id="2" schema="1" name="person_name" base_type="STR_CHAR" max_chars="100" />
+				<domain id="2" schema="1" name="person_name" base_type="STR_CHAR" max_chars="100" char_enc="UTF8" />
 				<table id="1" schema="1" name="person">
 					<table_col id="1" table="1" name="person_id" domain="1" mandatory="1" default_val="1" auto_inc="1" />
 					<table_col id="2" table="1" name="name" domain="2" mandatory="1" />
@@ -493,10 +494,10 @@ sub expected_model_xml_output {
 				</view>
 				<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
 				<routine_stmt id="5" routine="1" stmt_type="SPROC" call_sproc="CURSOR_OPEN">
-					<routine_expr id="6" expr_type="VAR" p_stmt="5" src_var="4" />
+					<routine_expr id="6" expr_type="VAR" p_stmt="5" routine_var="4" />
 				</routine_stmt>
 				<routine_stmt id="7" routine="1" stmt_type="SPROC" call_sproc="RETURN">
-					<routine_expr id="8" expr_type="VAR" p_stmt="7" src_var="4" />
+					<routine_expr id="8" expr_type="VAR" p_stmt="7" routine_var="4" />
 				</routine_stmt>
 			</routine>
 			<routine id="9" routine_type="ANONYMOUS" application="2" name="insert_a_person">
@@ -533,7 +534,7 @@ sub expected_model_xml_output {
 					<view_expr id="36" expr_type="ARG" view="30" view_part="SET" set_view_col="33" routine_arg="27" />
 					<view_expr id="37" expr_type="ARG" view="30" view_part="SET" set_view_col="34" routine_arg="28" />
 					<view_expr id="38" expr_type="ARG" view="30" view_part="SET" set_view_col="35" routine_arg="29" />
-					<view_expr id="39" expr_type="SFUNC" view="30" view_part="WHERE">
+					<view_expr id="39" expr_type="SFUNC" view="30" view_part="WHERE" call_sfunc="EQ">
 						<view_expr id="40" expr_type="COL" p_expr="39" src_col="32" />
 						<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
 					</view_expr>
@@ -546,7 +547,7 @@ sub expected_model_xml_output {
 					<view_src id="46" view="45" name="person" match_table="1">
 						<view_src_col id="47" src="46" match_table_col="1" />
 					</view_src>
-					<view_expr id="48" expr_type="SFUNC" view="45" view_part="WHERE">
+					<view_expr id="48" expr_type="SFUNC" view="45" view_part="WHERE" call_sfunc="EQ">
 						<view_expr id="49" expr_type="COL" p_expr="48" src_col="47" />
 						<view_expr id="50" expr_type="ARG" p_expr="48" routine_arg="44" />
 					</view_expr>
@@ -586,6 +587,65 @@ sub expected_model_xml_output {
 </root>
 '
 	);
+}
+
+######################################################################
+
+sub test_circular_ref_prevention {
+	my (undef, $class) = @_;
+	my $model = $class->new_container();
+
+	my $catalog_bp = make_a_node( 'catalog', 1, $model );
+	my $owner = make_a_child_node( 'owner', 1, $catalog_bp, 'catalog' );
+	my $schema = make_a_child_node( 'schema', 1, $catalog_bp, 'catalog' );
+	$schema->set_literal_attribute( 'name', 'gene' );
+	$schema->set_node_ref_attribute( 'owner', $owner );
+
+	my $vw1 = make_a_child_node( 'view', 1, $schema, 'schema' );
+	$vw1->set_enumerated_attribute( 'view_context', 'SCHEMA' );
+	$vw1->set_enumerated_attribute( 'view_type', 'COMPOUND' );
+	$vw1->set_literal_attribute( 'name', 'foo' );
+	$vw1->set_enumerated_attribute( 'c_merge_type', 'UNION' );
+
+	my $vw2 = make_a_child_node( 'view', 2, $vw1, 'p_view' );
+	$vw2->set_enumerated_attribute( 'view_context', 'INSIDE' );
+	$vw2->set_enumerated_attribute( 'view_type', 'SINGLE' );
+	$vw2->set_literal_attribute( 'name', 'bar' );
+
+	my $vw3 = make_a_child_node( 'view', 3, $vw2, 'p_view' );
+	$vw3->set_enumerated_attribute( 'view_context', 'INSIDE' );
+	$vw3->set_enumerated_attribute( 'view_type', 'SINGLE' );
+	$vw3->set_literal_attribute( 'name', 'bz' );
+
+	my $test1_passed = 0;
+	my $test2_passed = 0;
+	eval {
+		$vw2->set_node_ref_attribute( 'p_view', $vw3 );
+	};
+	if( my $exception = $@ ) {
+		if( UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
+			if( $exception->get_message_key() eq 'SSM_N_SET_NREF_AT_CIRC_REF' ) {
+				$test1_passed = 1;
+			}
+		}
+	}
+	eval {
+		$vw3->clear_parent_node_attribute_name();
+		$vw2->set_node_ref_attribute( 'p_view', $vw3 );
+		$vw3->set_parent_node_attribute_name( 'p_view' );
+	};
+	if( my $exception = $@ ) {
+		if( UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
+			if( $exception->get_message_key() eq 'SSM_N_SET_P_NODE_ATNM_CIRC_REF' ) {
+				$test2_passed = 1;
+			}
+		}
+	}
+
+	$model->with_all_nodes_test_mandatory_attributes();
+	$model->destroy();
+
+	return( $test1_passed, $test2_passed );
 }
 
 ######################################################################

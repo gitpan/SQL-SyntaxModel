@@ -3,11 +3,11 @@
 
 ######################### We start with some black magic to print on failure.
 
-BEGIN { $| = 1; print "1..4\n"; }
+BEGIN { $| = 1; print "1..6\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use t_SQL_SyntaxModel;
-use SQL::SyntaxModel 0.18;
-use SQL::SyntaxModel::L::en 0.05;
+use SQL::SyntaxModel 0.19;
+use SQL::SyntaxModel::L::en 0.06;
 $loaded = 1;
 print "ok 1\n";
 use strict;
@@ -70,6 +70,13 @@ eval {
 
 	$model->destroy();
 	result( (keys %{$model}) eq '0', "destruction of all objects" );
+
+	message( "Now test that circular reference creation can be blocked" );
+
+	my ($test1_passed, $test2_passed) = 
+		t_SQL_SyntaxModel->test_circular_ref_prevention( 'SQL::SyntaxModel' );
+	result( $test1_passed, "prevent creation of circular refs - set nref attr" );
+	result( $test2_passed, "prevent creation of circular refs - set pp name" );
 
 	message( "Other functional tests are not written yet; they will come later" );
 };

@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 ######################################################################
 
@@ -178,6 +178,10 @@ my %text_strings = (
 	'SSM_N_SET_NREF_AT_RECIP_LINKS' => 
 		"set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node is not yet ".
 		"in reciprocating status, so the current Node can not yet become a child of it",
+	'SSM_N_SET_NREF_AT_CIRC_REF' => 
+		"set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is a direct ".
+		"or indirect child of the current Node, so they can not be linked; ".
+		"if they were linked, that would result in a circular reference chain",
 
 	'SSM_N_SET_NREF_ATS_NO_ARGS' => 
 		"set_node_ref_attributes(): missing ATTRS argument",
@@ -203,6 +207,12 @@ my %text_strings = (
 		"set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
 		"either there is no Node attribute named '{NAME}' in '{HOSTTYPE}' Nodes, ".
 		"or that attribute can not be used as the primary parent Node",
+	'SSM_N_SET_P_NODE_ATNM_CIRC_REF' => 
+		"set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
+		"the Node ref attribute named '{NAME}' is valued with a Node ".
+		"that is a direct or indirect child of the current Node, so that Node ".
+		"can not become the primary parent of the current Node; ".
+		"if it was, that would result in a circular reference chain",
 
 	'SSM_N_EST_P_NODE_ATNM_NO_ARGS' => 
 		"estimate_parent_node_attribute_name(): missing NEW_PARENT argument",
@@ -286,15 +296,48 @@ my %text_strings = (
 	'SSM_N_TEMA_ATS_NID_VAL_NO_SET' => 
 		"test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
 		"the Node ID must be given a value",
-	'SSM_N_TEMA_ATS_LIT_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
-		"the literal attribute named '{NAME}' must be given a value",
-	'SSM_N_TEMA_ATS_ENUM_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
-		"the enumerated attribute named '{NAME}' must be given a value",
-	'SSM_N_TEMA_ATS_NREF_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
-		"the node attribute named '{NAME}' must be given a value",
+	'SSM_N_TEMA_ATS_MA_LIT_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the literal attribute named '{NAME}' must always be given a value",
+	'SSM_N_TEMA_ATS_MA_ENUM_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the enumerated attribute named '{NAME}' must always be given a value",
+	'SSM_N_TEMA_ATS_MA_NREF_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the node ref attribute named '{NAME}' must always be given a value",
+	'SSM_N_TEMA_ATS_NO_SINGLE_PP_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"exactly one of its primary parent Node attributes ({NAMES}) must have a value, and ".
+		"the others be undefined/null, but {NUMVALS} of these attributes are set now",
+	# Note, there currently are no $TPI_MCR_LITERALS.
+	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_YES_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the enumerated attribute named '{NAME}' must be left undefined/null when the same ".
+		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
+	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the enumerated attribute named '{NAME}' must be given a value when the same ".
+		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
+	'SSM_N_TEMA_ATS_MCR_NREF_VAL_YES_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the node ref attribute named '{NAME}' must be left undefined/null when the same ".
+		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
+	'SSM_N_TEMA_ATS_MCR_NREF_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the node ref attribute named '{NAME}' must be given a value when the same ".
+		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
+	'SSM_N_TEMA_ATS_MCEE_LIT_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the literal attribute named '{NAME}' must be given a value when the same ".
+		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
+	'SSM_N_TEMA_ATS_MCEE_ENUM_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the enumerated attribute named '{NAME}' must be given a value when the same ".
+		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
+	'SSM_N_TEMA_ATS_MCEE_NREF_VAL_NO_SET' => 
+		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the node ref attribute named '{NAME}' must be given a value when the same ".
+		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
 );
 
 ######################################################################
