@@ -443,7 +443,7 @@ sub create_and_populate_model {
 	# ... we are still missing a bunch of things in this example ...
 
 	# Now check that we didn't omit something important:
-	$model->with_all_nodes_test_mandatory_attributes();
+	$model->test_deferrable_constraints();
 
 	return( $model );
 }
@@ -635,7 +635,7 @@ sub test_circular_ref_prevention {
 		}
 	}
 
-	$model->with_all_nodes_test_mandatory_attributes();
+	$model->test_deferrable_constraints();
 	$model->destroy();
 
 	return( $test1_passed, $test2_passed );

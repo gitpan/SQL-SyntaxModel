@@ -3,7 +3,7 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
 	NAME	=> 'SQL::SyntaxModel',
-	VERSION => 0.37, # for the distribution itself, not of individual modules
+	VERSION_FROM => 'lib/SQL/SyntaxModel.pm', # finds $VERSION
 	PREREQ_PM => {
 		'Locale::KeyedText' => 0.06,
 	},

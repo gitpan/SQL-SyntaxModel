@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 ######################################################################
 
@@ -322,62 +322,62 @@ my %text_strings = (
 	'SSM_N_ADD_CH_NODE_NO_EST' => 
 		"$CN.add_child_node(): the current Node can not be the primary parent of the given Node",
 
-	'SSM_N_TEMA_ATS_NID_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
+	'SSM_N_TEDC_NID_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node has failed a test; ".
 		"the Node ID must be given a value",
-	'SSM_N_TEMA_ATS_MA_LIT_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MA_LIT_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the literal attribute named '{NAME}' must always be given a value",
-	'SSM_N_TEMA_ATS_MA_ENUM_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MA_ENUM_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must always be given a value",
-	'SSM_N_TEMA_ATS_MA_NREF_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MA_NREF_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must always be given a value",
-	'SSM_N_TEMA_ATS_NO_SINGLE_PP_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_NO_SINGLE_PP_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"exactly one of its primary parent Node attributes ({NAMES}) must have a value, and ".
 		"the others be undefined/null, but {NUMVALS} of these attributes are set now",
 	# Note, there currently are no $TPI_MCR_LITERALS.
-	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_YES_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCR_ENUM_VAL_YES_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be left undefined/null when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
-	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCR_ENUM_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be given a value when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
-	'SSM_N_TEMA_ATS_MCR_NREF_VAL_YES_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCR_NREF_VAL_YES_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be left undefined/null when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
-	'SSM_N_TEMA_ATS_MCR_NREF_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCR_NREF_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be given a value when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
-	'SSM_N_TEMA_ATS_MCEE_LIT_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCEE_LIT_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the literal attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEMA_ATS_MCEE_ENUM_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCEE_ENUM_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEMA_ATS_MCEE_NREF_VAL_NO_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_MCEE_NREF_VAL_NO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_NULL' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_CCE_ATTR_MUST_BE_NULL' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the Node ref attribute named '{NAME}' must be left empty when this ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
 		"it currently references a '{GIVEN}' Node",
-	'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_SET' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_CCE_ATTR_MUST_BE_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the Node ref attribute named '{NAME}' must have a value when this ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE' => 
-		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_TEDC_CCE_WRONG_NREF_NODE_TYPE' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the Node ref attribute named '{NAME}' may only reference a '{EXPTYPE}' Node when this ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
 		"it currently references a '{GIVEN}' Node",

@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.24';
+$VERSION = '0.38';
 
 use Locale::KeyedText 0.06;
 
@@ -79,6 +79,14 @@ my $CPROP_PSEUDONODES = 'pseudonodes'; # hash of arrays of Node refs
 my $CPROP_NEXT_FREE_NIDS = 'next_free_nids'; # hash (enum,id); next free node ids per node type
 	# Each property key is a valid node type, and the associated value is an integer that 
 	# is one higher than the highest Node ID that is or was in use by a Node in this Container.
+my $CPROP_DEF_CON_TESTED = 'def_con_tested'; # boolean - true by def, false when changes made
+	# This property is a status flag which says there have been no changes to the Nodes 
+	# in this Container since the last time test_deferrable_constraints() passed its tests, 
+	# and so the current Nodes are still valid.  It is used internally by 
+	# test_deferrable_constraints() to make code faster by avoiding un-necessary 
+	# repeated tests from multiple external Container.test_deferrable_constraints() calls.
+	# It is set true on a new empty Container, and set false when any Nodes are moved in 
+	# or out of the "well known" state within that Container, or are changed while in that state.
 #my $CPROP_CURR_NODE = 'curr_node'; # ref to a Node; used when "streaming" to or from XML
 	# I may instead make a new inner class for this, and there can be several of these 
 	# per container, such as if multiple streams are working in different areas at once; 
@@ -1405,6 +1413,7 @@ sub new {
 	$container->{$CPROP_ALL_NODES} = { map { ($_ => {}) } keys %NODE_TYPES };
 	$container->{$CPROP_PSEUDONODES} = { map { ($_ => []) } @L2_PSEUDONODE_LIST };
 	$container->{$CPROP_NEXT_FREE_NIDS} = { map { ($_ => 1) } keys %NODE_TYPES };
+	$container->{$CPROP_DEF_CON_TESTED} = 1;
 	return( $container );
 }
 
@@ -1462,13 +1471,22 @@ sub get_next_free_node_id {
 
 ######################################################################
 
-sub with_all_nodes_test_mandatory_attributes {
+sub deferrable_constraints_are_tested {
+	return( $_[0]->{$CPROP_DEF_CON_TESTED} );
+}
+
+sub test_deferrable_constraints {
 	my ($container) = @_;
+	if( $container->{$CPROP_DEF_CON_TESTED} ) {
+		return( 1 );
+	}
 	foreach my $nodes_by_type (values %{$container->{$CPROP_ALL_NODES}}) {
 		foreach my $node (values %{$nodes_by_type}) {
-			$node->test_mandatory_attributes();
+			$node->{$NPROP_LINKS_RECIP} or next; # Skip Nodes not in "Well Known" status.
+			$node->test_deferrable_constraints();
 		}
 	}
+	$container->{$CPROP_DEF_CON_TESTED} = 1;
 }
 
 ######################################################################
@@ -1599,6 +1617,9 @@ sub set_node_id {
 	$rh_cnl_ft->{$new_id} = $node; # temp reserve new+old
 	$node->{$NPROP_NODE_ID} = $new_id; # change self from old to new
 	delete( $rh_cnl_ft->{$old_id} ); # now only new reserved
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 
 	# Now adjust our "next free node id" counter if appropriate
 	my $rh_cnfni = $node->{$NPROP_CONTAINER}->{$CPROP_NEXT_FREE_NIDS};
@@ -1636,10 +1657,17 @@ sub clear_literal_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_literal_attribute_type( $attr_name ); # dies if bad arg
 	delete( $node->{$NPROP_AT_LITERALS}->{$attr_name} );
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub clear_literal_attributes {
-	$_[0]->{$NPROP_AT_LITERALS} = {};
+	my ($node) = @_;
+	$node->{$NPROP_AT_LITERALS} = {};
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub set_literal_attribute {
@@ -1672,6 +1700,9 @@ sub set_literal_attribute {
 	} else {} # $exp_lit_type eq 'cstr' or 'misc'; no change to value needed
 
 	$node->{$NPROP_AT_LITERALS}->{$attr_name} = $attr_value;
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub set_literal_attributes {
@@ -1714,10 +1745,17 @@ sub clear_enumerated_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_enumerated_attribute_type( $attr_name ); # dies if bad arg
 	delete( $node->{$NPROP_AT_ENUMS}->{$attr_name} );
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub clear_enumerated_attributes {
-	$_[0]->{$NPROP_AT_ENUMS} = {};
+	my ($node) = @_;
+	$node->{$NPROP_AT_ENUMS} = {};
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub set_enumerated_attribute {
@@ -1732,6 +1770,9 @@ sub set_enumerated_attribute {
 	}
 
 	$node->{$NPROP_AT_ENUMS}->{$attr_name} = $attr_value;
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub set_enumerated_attributes {
@@ -1775,12 +1816,18 @@ sub clear_node_ref_attribute {
 	my ($node, $attr_name) = @_;
 	$node->expected_node_ref_attribute_type( $attr_name ); # dies if bad arg
 	$node->_clear_node_ref_attribute( $attr_name );
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub clear_node_ref_attributes {
 	my ($node) = @_;
 	foreach my $attr_name (sort keys %{$node->{$NPROP_AT_NREFS}}) {
 		$node->_clear_node_ref_attribute( $attr_name );
+	}
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
 
@@ -1900,6 +1947,9 @@ sub set_node_ref_attribute {
 	if( ref($attr_value) eq ref($node) and $node->{$NPROP_LINKS_RECIP} ) {
 		# The attribute value is a Node object, and that Node should link back now, so do it.
 		push( @{$attr_value->{$NPROP_CHILD_NODES}}, $node );
+	}
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
 	}
 }
 
@@ -2021,7 +2071,11 @@ sub get_parent_node {
 }
 
 sub clear_parent_node_attribute_name {
-	$_[0]->{$NPROP_P_NODE_ATNM} = undef;
+	my ($node) = @_;
+	$node->{$NPROP_P_NODE_ATNM} = undef;
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 sub set_parent_node_attribute_name {
@@ -2050,6 +2104,9 @@ sub set_parent_node_attribute_name {
 		}
 	}
 	$node->{$NPROP_P_NODE_ATNM} = $attr_name;
+	if( $node->{$NPROP_LINKS_RECIP} ) {
+		$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node was changed.
+	}
 }
 
 ######################################################################
@@ -2198,6 +2255,7 @@ sub add_reciprocal_links {
 	}
 
 	$node->{$NPROP_LINKS_RECIP} = 1;
+	$container->{$CPROP_DEF_CON_TESTED} = 0; # A Node has become "Well Known".
 }
 
 sub remove_reciprocal_links {
@@ -2221,6 +2279,8 @@ sub remove_reciprocal_links {
 	}
 
 	$node->{$NPROP_LINKS_RECIP} = 0;
+	$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # A "Well Known" Node is gone.
+		# Turn on tests because this Node's absence affects *other* Well Known Nodes.
 }
 
 ######################################################################
@@ -2289,6 +2349,7 @@ sub move_before_sibling {
 	# Everything checks out, so now we perform the reordering.
 
 	@{$ra_search_list} = (@refs_before_both, @curr_node_refs, @sib_node_refs, @refs_after_both);
+	$node->{$NPROP_CONTAINER}->{$CPROP_DEF_CON_TESTED} = 0; # "Well Known" Node relation chg.
 }
 
 ######################################################################
@@ -2333,7 +2394,7 @@ sub add_child_nodes {
 
 ######################################################################
 
-sub test_mandatory_attributes {
+sub test_deferrable_constraints {
 	my ($node) = @_;
 	my $node_type = $node->{$NPROP_NODE_TYPE};
 	my $node_id = $node->{$NPROP_NODE_ID};
@@ -2342,7 +2403,7 @@ sub test_mandatory_attributes {
 	# First test 'id' attribute that is mandatory under all conditions.
 
 	unless( defined( $node->{$NPROP_NODE_ID} ) ) {
-		$node->_throw_error_message( 'SSM_N_TEMA_ATS_NID_VAL_NO_SET', 
+		$node->_throw_error_message( 'SSM_N_TEDC_NID_VAL_NO_SET', 
 			{ 'NAME' => $ATTR_ID, 'HOSTTYPE' => $node_type } );
 	}
 
@@ -2351,7 +2412,7 @@ sub test_mandatory_attributes {
 	if( my $mand_attrs = $type_info->{$TPI_MA_LITERALS} ) {
 		foreach my $attr_name (keys %{$mand_attrs}) {
 			unless( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_MA_LIT_VAL_NO_SET', 
+				$node->_throw_error_message( 'SSM_N_TEDC_MA_LIT_VAL_NO_SET', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
 			}
 		}
@@ -2359,7 +2420,7 @@ sub test_mandatory_attributes {
 	if( my $mand_attrs = $type_info->{$TPI_MA_ENUMS} ) {
 		foreach my $attr_name (keys %{$mand_attrs}) {
 			unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_MA_ENUM_VAL_NO_SET', 
+				$node->_throw_error_message( 'SSM_N_TEDC_MA_ENUM_VAL_NO_SET', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
 			}
 		}
@@ -2367,7 +2428,7 @@ sub test_mandatory_attributes {
 	if( my $mand_attrs = $type_info->{$TPI_MA_NREFS} ) {
 		foreach my $attr_name (keys %{$mand_attrs}) {
 			unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_MA_NREF_VAL_NO_SET', 
+				$node->_throw_error_message( 'SSM_N_TEDC_MA_NREF_VAL_NO_SET', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
 			}
 		}
@@ -2383,7 +2444,7 @@ sub test_mandatory_attributes {
 				}
 			}
 			if( $valued_candidates != 1 ) {
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_NO_SINGLE_PP_SET', 
+				$node->_throw_error_message( 'SSM_N_TEDC_NO_SINGLE_PP_SET', 
 					{ 'NAMES' => "@{$p_node_atnms}", 'NUMVALS' => $valued_candidates, 
 					'HOSTTYPE' => $node_type, 'ID' => $node_id } );
 			}
@@ -2405,13 +2466,13 @@ sub test_mandatory_attributes {
 			foreach my $attr_name (keys %{$mand_attrs}) {
 				if( $p_node_at_is_set ) {
 					if( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCR_ENUM_VAL_YES_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCR_ENUM_VAL_YES_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
 							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
 					}
 				} else { # if !$p_node_at_is_set
 					unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCR_ENUM_VAL_NO_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCR_ENUM_VAL_NO_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
 							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
 					}
@@ -2422,13 +2483,13 @@ sub test_mandatory_attributes {
 			foreach my $attr_name (keys %{$mand_attrs}) {
 				if( $p_node_at_is_set ) {
 					if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCR_NREF_VAL_YES_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCR_NREF_VAL_YES_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
 					}
 				} else { # if !$p_node_at_is_set
 					unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCR_NREF_VAL_NO_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCR_NREF_VAL_NO_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
 							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
 					}
@@ -2447,7 +2508,7 @@ sub test_mandatory_attributes {
 				my @equality_tests = @{$mand_attrs->{$attr_name}};
 				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
 					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCEE_LIT_VAL_NO_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_LIT_VAL_NO_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
 					}
@@ -2461,7 +2522,7 @@ sub test_mandatory_attributes {
 				my @equality_tests = @{$mand_attrs->{$attr_name}};
 				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
 					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCEE_ENUM_VAL_NO_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_ENUM_VAL_NO_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
 					}
@@ -2475,7 +2536,7 @@ sub test_mandatory_attributes {
 				my @equality_tests = @{$mand_attrs->{$attr_name}};
 				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
 					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEMA_ATS_MCEE_NREF_VAL_NO_SET', 
+						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_NREF_VAL_NO_SET', 
 							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
 					}
@@ -2502,19 +2563,19 @@ sub test_mandatory_attributes {
 				# No-op, no problem, $attr_value should be empty and is empty.
 			} elsif( !$exp_node_type and $attr_value ) {
 				# A null $exp_node_type means $attr_value should be null.
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_NULL', 
+				$node->_throw_error_message( 'SSM_N_TEDC_CCE_ATTR_MUST_BE_NULL', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 					'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
 					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
 			} elsif( $exp_node_type and !$attr_value ) {
 				# A set $exp_node_type means $attr_value must be set.
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_SET', 
+				$node->_throw_error_message( 'SSM_N_TEDC_CCE_ATTR_MUST_BE_SET', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
 			} else {
 				# A set $exp_node_type means $attr_value must have the same type.
 				unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-					$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE', 
+					$node->_throw_error_message( 'SSM_N_TEDC_CCE_WRONG_NREF_NODE_TYPE', 
 						{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
 						'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
 						'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
@@ -2633,7 +2694,7 @@ included.)  However, here are a few example usage lines:
 		# ... add a lot more Nodes
 
 		# Now check that we didn't omit something important:
-		$model->with_all_nodes_test_mandatory_attributes();
+		$model->test_deferrable_constraints();
 
 		# Now serialize all our Nodes to see if we stored what we expected:
 		print $model->get_all_properties_as_xml_str();
@@ -2947,21 +3008,21 @@ which is a reference implementation of a SQL generator for SQL::SyntaxModel.>
 
 =head1 DESCRIPTION
 
-The SQL::SyntaxModel Perl 5 module is intended to be a powerful but easy
-to use replacement for SQL strings (including support for placeholders), which
-you can use to make queries against a database.  Each SQL::SyntaxModel object
-can represent a non-ambiguous structured command for a database to execute, or
-one can be a non-ambiguous structured description of a database schema object. 
-This class supports all types of database operations, including both data
-manipulation and schema manipulation, as well as managing database instances
-and users.  You typically construct a database query by setting appropriate
-attributes of these objects, and you execute a database query by evaluating the
-same attributes.  SQL::SyntaxModel objects are designed to be equivalent to SQL
-in both the type of information they carry and in their conceptual structure.
-This is analagous to how XML DOMs are objects that are equivalent to XML
-strings, and they can be converted back and forth at will.  If you know SQL, or
-even just relational database theory in general, then this module should be
-easy to learn.
+The SQL::SyntaxModel Perl 5 module is intended to be a powerful but easy to use
+replacement for SQL strings (including support for placeholders), which you can
+use to make queries against a database.  Each SQL::SyntaxModel object can
+represent a non-ambiguous rigorously structured command for a database to
+execute, or one can be a non-ambiguous rigorously structured description of a
+database schema object. This class supports all types of database operations,
+including both data manipulation and schema manipulation, as well as managing
+database instances and users.  You typically construct a database query by
+setting appropriate attributes of these objects, and you execute a database
+query by evaluating the same attributes.  SQL::SyntaxModel objects are designed
+to be equivalent to SQL in both the type of information they carry and in their
+conceptual structure. This is analagous to how XML DOMs are objects that are
+equivalent to XML strings, and they can be converted back and forth at will. 
+If you know SQL, or even just relational database theory in general, then this
+module should be easy to learn.
 
 SQL::SyntaxModels are intended to represent all kinds of SQL, both DML and DDL,
 both ANSI standard and RDBMS vendor extensions.  Unlike basically all of the
@@ -3413,19 +3474,37 @@ you producing them in some other way.  An example situation when this method
 would be useful is if you are building a SQL::SyntaxModel by scanning the
 schema of an existing database.
 
-=head2 with_all_nodes_test_mandatory_attributes()
+=head2 deferrable_constraints_are_tested()
 
-	my $model->with_all_nodes_test_mandatory_attributes();
+	my $is_all_ok = $model->deferrable_constraints_are_tested();
 
-This "getter" method implements a type of deferrable data validation.  It will
-iterate through every Node in this Container and invoke its
-test_mandatory_attributes() method; the order that the Nodes are tested is not
-defined, but every one will get tested regardless of its state or connectedness
-with the other Nodes.  That said, a failure with any one Node will cause the
-testing of the whole set to abort, as the offending Node throws an exception
-which this method doesn't catch; any untested Nodes could also have failed. 
-Only when you can call this method without any exceptions being thrown will all
-Nodes have passed the tests.
+This "getter" method will return the boolean "deferrable constraints are
+tested" property of this Container.  This property is true when all "Well
+Known" Nodes in this Container are known to be free of all data errors, both
+individually and collectively.  This property is initially set to true when a
+Container is new and empty; it is also set to true by
+Container.test_deferrable_constraints() when all of its tests complete without
+finding any problems.  This property is set to false when any changes are made
+to a "Well Known" Node in this Container, which includes moving the Node in to
+or out of "Well Known" status.
+
+=head2 test_deferrable_constraints()
+
+	$model->test_deferrable_constraints();
+
+This "getter" method implements several types of deferrable data validation, to
+make sure that every "Well Known" Node in this Container is ready to be used,
+both individually and collectively; it throws an exception if it can find
+anything wrong.  Note that a failure with any one Node will cause the testing
+of the whole set to abort, as the offending Node throws an exception which this
+method doesn't catch; any untested Nodes could also have failed, so you will
+have to re-run this method after fixing the problem.  This method ignores any
+"At Home" Nodes in this Container, and runs its collective tests as if they
+didn't exist.  This method will short-circuit and not perform any tests if this
+Container's "deferrable constraints are tested" property is true, so to avoid
+unnecessary repeated tests due to redundant external invocations; this allows
+you to put validation checks for safety everywhere in your program while
+avoiding a corresponding performance hit.
 
 =head1 NODE CONSTRUCTOR FUNCTIONS AND METHODS
 
@@ -3768,13 +3847,13 @@ new or first primary parent Node of NEW_CHILD.
 This "setter" method takes an array ref in its single LIST argument, and calls
 add_child_node() for each element found in it.
 
-=head2 test_mandatory_attributes()
+=head2 test_deferrable_constraints()
 
-This "getter" method implements a type of deferrable data validation.  It will
-look at all of this Node's attributes which must have a value set before this
-Node is ready to be used, and throw an exception if any are not.  This method
-confines its tests to the specific Node being tested, and does not perform more
-complicated tests that require looking at multiple Nodes together.
+This "getter" method implements several types of deferrable data validation, to
+make sure that this Node is ready to be used; it throws an exception if it can
+find anything wrong.  This method can be used on any Node regardless of its
+current node evolution state, but that state does affect which tests are
+performed; "Well Known" Nodes get all the tests, while "Alone" Nodes skip some.
 
 =head1 CONTAINER OR NODE METHODS FOR DEBUGGING
 
@@ -3965,11 +4044,12 @@ cludge.>
 =head1 SEE ALSO
 
 perl(1), SQL::SyntaxModel::L::en, SQL::SyntaxModel::Language,
-SQL::SyntaxModel::API_C, Rosetta::Utility::SQLBuilder,
-SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID, Rosetta,
-Rosetta::Framework, DBI, SQL::Statement, SQL::Translator, SQL::YASP,
-SQL::Generator, SQL::Schema, SQL::Abstract, SQL::Snippet, SQL::Catalog,
-DB::Ent, DBIx::Abstract, DBIx::AnyDBD, DBIx::DBSchema, DBIx::Namespace,
-DBIx::SearchBuilder, TripleStore, and various other modules.
+SQL::SyntaxModel::API_C, Locale::KeyedText, Rosetta,
+Rosetta::Utility::SQLBuilder, Rosetta::Engine::Generic,
+SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID, DBI, SQL::Statement,
+SQL::Translator, SQL::YASP, SQL::Generator, SQL::Schema, SQL::Abstract,
+SQL::Snippet, SQL::Catalog, DB::Ent, DBIx::Abstract, DBIx::AnyDBD,
+DBIx::DBSchema, DBIx::Namespace, DBIx::SearchBuilder, TripleStore, and various
+other modules.
 
 =cut

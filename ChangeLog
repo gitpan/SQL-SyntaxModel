@@ -1,3 +1,37 @@
+2004-08-16   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.38.
+
+	* From now on, SQL::SyntaxModel and its primary distribution will have
+	identical version/release numbers, to help avoid public confusion as to
+	which distribution releases contain which SQL::SyntaxModel versions.  This
+	distribution's Makefile.pl now uses "VERSION_FROM =>
+	'lib/SQL/SyntaxModel.pm'" rather than "VERSION => N".  As such,
+	SyntaxModel.pm will always have its own version number incremented for any
+	distribution changes, even if the changes are otherwise entirely in other
+	files.  With this first such release, SyntaxModel.pm is now at v0.38, up
+	from v0.24 in the previous release.
+
+	* Other new code file versions are: en.pm v0.10.
+
+	* Renamed both SyntaxModel.pm methods Node.test_mandatory_attributes() and
+	Container.with_all_nodes_test_mandatory_attributes() to
+	[Node|Container].test_deferrable_constraints(); the new name better
+	describes their purpose.  Corresponding en.pm updates.	Updated the
+	Container method so that it now skips over Nodes that are not in "Well
+	Known" status.  Rewrote the POD descriptions for both methods also.
+
+	* Added new Container.deferrable_constraints_are_tested() method and
+	corresponding "deferrable constraints are tested" Container property which
+	keeps track of whether any changes were made to a Container's Nodes since
+	the last Container.test_deferrable_constraints() call.  This property is
+	used to make the module faster in the face of redundant calls to the
+	test_def*() method; you can now place SSM data validation test calls for
+	safety all over your program without seeing a corresponding performance
+	hit.  Updated about a dozen other methods to read or set this property.
+
+	* Other minor documentation updates.
+
 2004-08-06   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.37.
