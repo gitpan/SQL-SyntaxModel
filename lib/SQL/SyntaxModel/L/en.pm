@@ -10,8 +10,7 @@ package SQL::SyntaxModel::L::en;
 use 5.006;
 use strict;
 use warnings;
-use vars qw($VERSION);
-$VERSION = '0.12';
+our $VERSION = '0.13';
 
 ######################################################################
 
@@ -78,280 +77,354 @@ my %text_strings = (
 	'SSM_C_GET_NODE_NO_ARG_ID' => 
 		"$CC.get_node(): missing NODE_ID argument",
 	'SSM_C_GET_NODE_BAD_TYPE' => 
-		"$CC.get_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_node(): invalid NODE_TYPE argument; there is no Node Type named '{ARGNTYPE}'",
 
 	'SSM_C_GET_CH_NODES_BAD_TYPE' => 
-		"$CC.get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{ARGNTYPE}'",
 
 	'SSM_C_GET_NFNI_NO_ARG_TYPE' => 
 		"$CC.get_next_free_node_id(): missing NODE_TYPE argument",
 	'SSM_C_GET_NFNI_BAD_TYPE' => 
-		"$CC.get_next_free_node_id(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_next_free_node_id(): invalid NODE_TYPE argument; there is no Node Type named '{ARGNTYPE}'",
 
 	'SSM_N_NEW_NODE_NO_ARGS' => 
 		"$CN.new_node(): missing NODE_TYPE argument",
 	'SSM_N_NEW_NODE_BAD_TYPE' => 
-		"$CN.new_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CN.new_node(): invalid NODE_TYPE argument; there is no Node Type named '{ARGNTYPE}'",
 
 	'SSM_N_DEL_NODE_IN_CONT' => 
-		"$CN.delete_node(): this Node can not be deleted because it is ".
+		"$CN.delete_node(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node can not be deleted because it is ".
 		"still in a Container; you must take it from there first",
 
 	'SSM_N_CLEAR_NODE_ID_IN_CONT' => 
-		"$CN.clear_node_id(): you can not clear the Node Id (value '{ID}') of this ".
-		"'{TYPE}' Node because the Node is in a Container",
+		"$CN.clear_node_id(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"you can not clear the Node Id because the Node is in a Container",
 
 	'SSM_N_SET_NODE_ID_NO_ARGS' => 
-		"$CN.set_node_id(): missing NEW_ID argument",
+		"$CN.set_node_id(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing NEW_ID argument",
 	'SSM_N_SET_NODE_ID_BAD_ARG' => 
-		"$CN.set_node_id(): invalid NEW_ID argument; a Node Id may only be a positive integer; ".
+		"$CN.set_node_id(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NEW_ID argument; a Node Id may only be a positive integer; ".
 		"you tried to set it to '{ARG}'",
 	'SSM_N_SET_NODE_ID_DUPL_ID' => 
-		"$CN.set_node_id(): invalid NEW_ID argument; the Node Id value of '{ID}' you tried to set ".
-		"is already in use by another '{TYPE}' Node in the same Container; it must be unique",
+		"$CN.set_node_id(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NEW_ID argument; the Node Id value of '{ARG}' you tried to set ".
+		"is already in use by another '{NTYPE}' Node in the same Container; it must be unique",
 
 	'SSM_N_EXP_LIT_AT_NO_ARGS' => 
-		"$CN.expected_literal_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_literal_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_NAME argument",
 	'SSM_N_EXP_LIT_AT_INVAL_NM' => 
-		"$CN.expected_literal_attribute_type(): invalid ATTR_NAME argument; ".
-		"there is no literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
+		"$CN.expected_literal_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; there is no literal attribute named '{ATNM}' in this Node",
 
 	'SSM_N_SET_LIT_AT_NO_ARG_VAL' => 
-		"$CN.set_literal_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_literal_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_VALUE argument",
 	'SSM_N_SET_LIT_AT_INVAL_V_BOOL' => 
-		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
-		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
-		"boolean value, as expressed by '0' or '1'; you tried to set it to '{VAL}'",
+		"$CN.set_literal_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; this Node's literal attribute named '{ATNM}' may only be ".
+		"a boolean value, as expressed by '0' or '1'; you tried to set it to '{ARG}'",
 	'SSM_N_SET_LIT_AT_INVAL_V_UINT' => 
-		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
-		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
-		"non-negative integer; you tried to set it to '{VAL}'",
+		"$CN.set_literal_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; this Node's literal attribute named '{ATNM}' may only be ".
+		"a non-negative integer; you tried to set it to '{ARG}'",
 	'SSM_N_SET_LIT_AT_INVAL_V_SINT' => 
-		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
-		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be an ".
-		"integer; you tried to set it to '{VAL}'",
+		"$CN.set_literal_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; this Node's literal attribute named '{ATNM}' may only be ".
+		"an integer; you tried to set it to '{ARG}'",
 
 	'SSM_N_SET_LIT_ATS_NO_ARGS' => 
-		"$CN.set_literal_attributes(): missing ATTRS argument",
+		"$CN.set_literal_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTRS argument",
 	'SSM_N_SET_LIT_ATS_BAD_ARGS' => 
-		"$CN.set_literal_attributes(): invalid ATTRS argument; ".
-		"it is not a hash ref, but rather is '{ARG}",
+		"$CN.set_literal_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTRS argument; it is not a hash ref, but rather is '{ARG}",
 
 	'SSM_N_EXP_ENUM_AT_NO_ARGS' => 
-		"$CN.expected_enumerated_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_enumerated_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_NAME argument",
 	'SSM_N_EXP_ENUM_AT_INVAL_NM' => 
-		"$CN.expected_enumerated_attribute_type(): invalid ATTR_NAME argument; ".
-		"there is no enumerated attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
+		"$CN.expected_enumerated_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; there is no enumerated attribute named '{ATNM}' in this Node",
 
 	'SSM_N_SET_ENUM_AT_NO_ARG_VAL' => 
-		"$CN.set_enumerated_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_enumerated_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_VALUE argument",
 	'SSM_N_SET_ENUM_AT_INVAL_V' => 
-		"$CN.set_enumerated_attribute(): invalid ATTR_VALUE argument; ".
-		"the enumerated attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
-		"'{ENUMTYPE}' value; you tried to set it to '{VAL}'",
+		"$CN.set_enumerated_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; this Node's enumerated attribute named '{ATNM}' may only be ".
+		"a '{ENUMTYPE}' value; you tried to set it to '{ARG}'",
 
 	'SSM_N_SET_ENUM_ATS_NO_ARGS' => 
-		"$CN.set_enumerated_attributes(): missing ATTRS argument",
+		"$CN.set_enumerated_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTRS argument",
 	'SSM_N_SET_ENUM_ATS_BAD_ARGS' => 
-		"$CN.set_enumerated_attributes(): invalid ATTRS argument; ".
-		"it is not a hash ref, but rather is '{ARG}'",
+		"$CN.set_enumerated_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTRS argument; it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_EXP_NREF_AT_NO_ARGS' => 
-		"$CN.expected_node_ref_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_node_ref_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_NAME argument",
 	'SSM_N_EXP_NREF_AT_INVAL_NM' => 
-		"$CN.expected_node_ref_attribute_type(): invalid ATTR_NAME argument; ".
-		"there is no Node attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
+		"$CN.expected_node_ref_attribute_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; there is no Node attribute named '{ATNM}' in this Node",
 
 	'SSM_N_SET_NREF_AT_NO_ARG_VAL' => 
-		"$CN.set_node_ref_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_VALUE argument",
 	'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the attribute named ".
-		"'{NAME}' in '{HOSTTYPE}' Nodes may only reference a '{EXPTYPE}' Node, but ".
-		"you tried to set it to a '{GIVEN}' Node",
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; this Node's Node ref attribute named '{ATNM}' may only ".
+		"reference a '{EXPNTYPE}' Node, but you tried to set it to a '{ARGNTYPE}' Node",
 	'SSM_N_SET_NREF_AT_DIFF_CONT' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is not in ".
-		"the same Container as the current Node, so they can not be linked",
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; that Node is not in ".
+		"the same Container as this current Node, so they can not be linked",
 	'SSM_N_SET_NREF_AT_ONE_CONT' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; a Node that is in a ".
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; a Node that is in a ".
 		"Container can not be linked to one that is not",
 	'SSM_N_SET_NREF_AT_MISS_NID' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node ".
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; the given Node ".
 		"lacks a Node Id, and one is required to link to it from this one",
 	'SSM_N_SET_NREF_AT_BAD_ARG_VAL' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and a Node Id may only be a positive integer",
 	'SSM_N_SET_NREF_AT_NONEX_NID' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
-		"and it does not match the Id of any '{EXPTYPE}' Node in this Container",
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
+		"and it does not match the Id of any '{EXPNTYPE}' Node in this Container",
 	'SSM_N_SET_NREF_AT_RECIP_LINKS' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node is not yet ".
-		"in reciprocating status, so the current Node can not yet become a child of it",
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; the given Node is not yet ".
+		"in reciprocating status, so this current Node can not yet become a child of it",
 	'SSM_N_SET_NREF_AT_CIRC_REF' => 
-		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is a direct ".
-		"or indirect child of the current Node, so they can not be linked; ".
+		"$CN.set_node_ref_attribute(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_VALUE argument; that Node is a direct ".
+		"or indirect child of this current Node, so they can not be linked; ".
 		"if they were linked, that would result in a circular reference chain",
 
 	'SSM_N_SET_NREF_ATS_NO_ARGS' => 
-		"$CN.set_node_ref_attributes(): missing ATTRS argument",
+		"$CN.set_node_ref_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTRS argument",
 	'SSM_N_SET_NREF_ATS_BAD_ARGS' => 
-		"$CN.set_node_ref_attributes(): invalid ATTRS argument; ".
-		"it is not a hash ref, but rather is '{ARG}'",
+		"$CN.set_node_ref_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTRS argument; it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_EXP_AT_MT_NO_ARGS' => 
-		"$CN.expected_attribute_major_type(): missing ATTR_NAME argument",
+		"$CN.expected_attribute_major_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_NAME argument",
 	'SSM_N_EXP_AT_MT_INVAL_NM' => 
-		"$CN.expected_attribute_major_type(): invalid ATTR_NAME argument; ".
-		"there is no attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
+		"$CN.expected_attribute_major_type(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; there is no attribute named '{ATNM}' in this Node",
 
 	'SSM_N_SET_ATS_NO_ARGS' => 
-		"$CN.set_attributes(): missing ATTRS argument",
+		"$CN.set_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTRS argument",
 	'SSM_N_SET_ATS_BAD_ARGS' => 
-		"$CN.set_attributes(): invalid ATTRS argument; ".
-		"it is not a hash ref, but rather is '{ARG}'",
+		"$CN.set_attributes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTRS argument; it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_SET_P_NODE_ATNM_NO_ARGS' => 
-		"$CN.set_parent_node_attribute_name(): missing ATTR_NAME argument",
+		"$CN.set_parent_node_attribute_name(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing ATTR_NAME argument",
 	'SSM_N_SET_P_NODE_ATNM_INVAL_NM' => 
-		"$CN.set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
-		"either there is no Node attribute named '{NAME}' in '{HOSTTYPE}' Nodes, ".
+		"$CN.set_parent_node_attribute_name(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; either there is no Node attribute named '{ATNM}' in this Node, ".
 		"or that attribute can not be used as the primary parent Node",
 	'SSM_N_SET_P_NODE_ATNM_CIRC_REF' => 
-		"$CN.set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
-		"the Node ref attribute named '{NAME}' is valued with a Node ".
-		"that is a direct or indirect child of the current Node, so that Node ".
-		"can not become the primary parent of the current Node; ".
+		"$CN.set_parent_node_attribute_name(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid ATTR_NAME argument; this Node's Node ref attribute named '{ATNM}' is valued ".
+		"with a Node that is a direct or indirect child of this current Node, so that Node ".
+		"can not become the primary parent of this current Node; ".
 		"if it was, that would result in a circular reference chain",
 
 	'SSM_N_EST_P_NODE_ATNM_NO_ARGS' => 
-		"$CN.estimate_parent_node_attribute_name(): missing NEW_PARENT argument",
+		"$CN.estimate_parent_node_attribute_name(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing NEW_PARENT argument",
 	'SSM_N_EST_P_NODE_ATNM_BAD_ARG' => 
-		"$CN.estimate_parent_node_attribute_name(): invalid NEW_PARENT argument; ".
-		"it is not a Node object, but rather is '{ARG}'",
+		"$CN.estimate_parent_node_attribute_name(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NEW_PARENT argument; it is not a Node object, but rather is '{ARG}'",
 
 	'SSM_N_PI_CONT_NO_ARGS' => 
-		"$CN.put_in_container(): missing NEW_CONTAINER argument",
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing NEW_CONTAINER argument",
 	'SSM_N_PI_CONT_BAD_ARG' => 
-		"$CN.put_in_container(): invalid NEW_CONTAINER argument; ".
-		"it is not a Container object, but rather is '{ARG}'",
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NEW_CONTAINER argument; it is not a Container object, but rather is '{ARG}'",
 	'SSM_N_PI_CONT_NO_NODE_ID' => 
-		"$CN.put_in_container(): this Node can not be put in a Container yet ".
-		"as this Node has no NODE_ID defined",
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node can not be put in a Container yet as this Node has no NODE_ID defined",
 	'SSM_N_PI_CONT_HAVE_ALREADY' => 
-		"$CN.put_in_container(): this Node already lives in a Container; you ".
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node already lives in a Container; you ".
 		"must take this Node from there before putting it in a different one",
 	'SSM_N_PI_CONT_DUPL_ID' => 
-		"$CN.put_in_container(): this Node can not be put into the given Container ".
-		"because its Node Id value of '{ID}' is already in use by another '{TYPE}' Node ".
-		"in the same Container; one of them needs to be changed first",
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node can not be put into the given Container ".
+		"because it has the same Node Id value as another '{NTYPE}' Node already ".
+		"in the same Container; one of these Node Ids needs to be changed first",
 	'SSM_N_PI_CONT_NONEX_AT_NREF' => 
-		"$CN.put_in_container(): this Node can not be put into the given Container ".
-		"because the Node attribute named '{ATNM}' expects to link to a '{TYPE}' Node ".
-		"with a Node Id of '{ID}', but no such Node exists in the given Container",
+		"$CN.put_in_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node can not be put into the given Container ".
+		"because the Node attribute named '{ATNM}' expects to link to a '{EXPNTYPE}' Node ".
+		"with a Node Id of '{EXPNID}', but no such Node exists in the given Container",
 
 	'SSM_N_TF_CONT_RECIP_LINKS' => 
-		"$CN.take_from_container(): this Node can not be taken from its Container yet ".
+		"$CN.take_from_container(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node can not be taken from its Container yet ".
 		"as other Nodes that this Node refers to in its attributes have reciprocal links to it",
 
 	'SSM_N_ADD_RL_NO_NODE_ID' => 
-		"$CN.add_reciprocal_links(): this Node is not in a Container, ".
-		"so no other Nodes can link to it as a child",
+		"$CN.add_reciprocal_links(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node is not in a Container, so no other Nodes can link to it as a child",
 
 	'SSM_N_REM_RL_HAS_CHILD' => 
-		"$CN.remove_reciprocal_links(): this Node has child Nodes of its ".
-		"own, so it can not be removed from reciprocating status",
+		"$CN.remove_reciprocal_links(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node has child Nodes of its own, so it can not be removed from reciprocating status",
 
 	'SSM_N_MOVE_PRE_SIB_NO_RL' => 
-		"$CN.move_before_sibling(): this Node is not in reciprocating ".
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this Node is not in reciprocating ".
 		"status and therefore it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_NO_S_ARG' => 
-		"$CN.move_before_sibling(): missing SIBLING argument",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing SIBLING argument",
 	'SSM_N_MOVE_PRE_SIB_BAD_S_ARG' => 
-		"$CN.move_before_sibling(): invalid SIBLING argument; ".
-		"it is not a Node object, but rather is '{ARG}'",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid SIBLING argument; it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_MOVE_PRE_SIB_S_NO_RL' => 
-		"$CN.move_before_sibling(): invalid SIBLING argument; that Node is not in reciprocating ".
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid SIBLING argument; that Node is not in reciprocating ".
 		"status and therefore it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_S_DIFF_CONT' => 
-		"$CN.move_before_sibling(): invalid SIBLING argument; that Node is not in ".
-		"the same Container (if any) as the current Node, so they can not be siblings",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid SIBLING argument; that Node is not in ".
+		"the same Container (if any) as this current Node, so they can not be siblings",
 	'SSM_N_MOVE_PRE_SIB_BAD_P_ARG' => 
-		"$CN.move_before_sibling(): invalid PARENT argument; ".
-		"it is not a Node object, but rather is '{ARG}'",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid PARENT argument; it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_MOVE_PRE_SIB_P_DIFF_CONT' => 
-		"$CN.move_before_sibling(): invalid PARENT argument; that Node is not in ".
-		"the same Container (if any) as the current Node, so they can not be related",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid PARENT argument; that Node is not in ".
+		"the same Container (if any) as this current Node, so they can not be related",
 	'SSM_N_MOVE_PRE_SIB_NO_P_ARG_OR_PP_OR_PS' => 
-		"$CN.move_before_sibling(): no PARENT argument was given, and the current Node ".
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"no PARENT argument was given, and this current Node ".
 		"has no primary parent Node or parent pseudo-Node for it to default to",
 	'SSM_N_MOVE_PRE_SIB_P_NOT_P' => 
-		"$CN.move_before_sibling(): invalid PARENT argument; ".
-		"the current Node is not a child of that Node",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid PARENT argument; this current Node is not a child of that Node",
 	'SSM_N_MOVE_PRE_SIB_S_NOT_S' => 
-		"$CN.move_before_sibling(): invalid SIBLING argument; ".
-		"the current Node does not share PARENT (or its primary parent) with that Node",
+		"$CN.move_before_sibling(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid SIBLING argument; this current Node does not share PARENT ".
+		"(or its primary parent) with that Node",
 
 	'SSM_N_GET_CH_NODES_BAD_TYPE' => 
-		"$CN.get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CN.get_child_nodes(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NODE_TYPE argument; there is no Node Type named '{NTYPE}'",
 
 	'SSM_N_ADD_CH_NODE_NO_ARGS' => 
-		"$CN.add_child_node(): missing NEW_CHILD argument",
+		"$CN.add_child_node(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"missing NEW_CHILD argument",
 	'SSM_N_ADD_CH_NODE_BAD_ARG' => 
-		"$CN.add_child_node(): invalid NEW_CHILD argument; ".
-		"it is not a Node object, but rather is '{ARG}'",
+		"$CN.add_child_node(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"invalid NEW_CHILD argument; it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_ADD_CH_NODE_NO_EST' => 
-		"$CN.add_child_node(): the current Node can not be the primary parent of the given Node",
+		"$CN.add_child_node(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"this current Node can not be the primary parent of the given Node",
 
-	'SSM_N_TEDC_NID_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node has failed a test; ".
+	'SSM_N_ASDC_NID_VAL_NO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"its Node ID must be given a value",
-	'SSM_N_TEDC_P_NODE_ATNM_NOT_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_P_NODE_ATNM_NOT_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"its Primary Parent Node Attribute Name must be given a value ".
 		"(this Node type does not have a pseudo-Node parent)",
-	'SSM_N_TEDC_PP_TOO_MANY_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_PP_TOO_MANY_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"{NUMVALS} of its primary parent Node attributes ({ATNMS}) are set; ".
 		"you must change all but one of them to be undefined/null",
-	'SSM_N_TEDC_PP_ZERO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_PP_ZERO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"none of its primary parent Node attributes ({ATNMS}) are are set; ".
 		"you must give a value to exactly one of them",
-	'SSM_N_TEDC_MA_LIT_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the literal attribute named '{ATNM}' must always be given a value",
-	'SSM_N_TEDC_MA_ENUM_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the enumerated attribute named '{ATNM}' must always be given a value",
-	'SSM_N_TEDC_MA_NREF_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_MA_LIT_VAL_NO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
+		"this Node's literal attribute named '{ATNM}' must always be given a value",
+	'SSM_N_ASDC_MA_ENUM_VAL_NO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
+		"this Node's enumerated attribute named '{ATNM}' must always be given a value",
+	'SSM_N_ASDC_MA_NREF_VAL_NO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"the node ref attribute named '{ATNM}' must always be given a value",
 
-	'SSM_N_TEDC_MUTEX_TOO_MANY_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_MUTEX_TOO_MANY_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"{NUMVALS} of its attributes ({ATNMS}) in the mutual-exclusivity group '{MUTEX}' are set; ".
 		"you must change all but one of them to be undefined/null",
-	'SSM_N_TEDC_MUTEX_ZERO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_MUTEX_ZERO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"none of its attributes ({ATNMS}) in the mutual-exclusivity group '{MUTEX}' are set; ".
 		"you must give a value to exactly one of them",
 
-	'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_LATDP_DEP_ON_IS_NULL' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"the depended-on attribute '{DEP_ON}' is undef/null so all of its dependents must be too; ".
 		"you must clear these {NUMVALS} attributes: {ATNMS}",
-	'SSM_N_TEDC_LATDP_DEP_ON_HAS_WRONG_VAL' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_LATDP_DEP_ON_HAS_WRONG_VAL' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which is different ".
 		"than the value(s) that certain dependents require for being set; ".
 		"you must clear these {NUMVALS} attributes: {ATNMS}",
-	'SSM_N_TEDC_LATDP_TOO_MANY_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_LATDP_TOO_MANY_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which means that ".
 		"only one of these {NUMVALS} currently set dependent attributes may be set: {ATNMS}",
-	'SSM_N_TEDC_LATDP_ZERO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+	'SSM_N_ASDC_LATDP_ZERO_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
 		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which means that ".
 		"exactly one of these dependent attributes must be set: {ATNMS}",
+
+	'SSM_N_ASDC_CH_N_TOO_FEW_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; this Node has too few ({COUNT}) ".
+		"primary-child '{CNTYPE}' Nodes; you must have at least {EXPNUM} of them",
+	'SSM_N_ASDC_CH_N_TOO_MANY_SET' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; this Node has too many ({COUNT}) ".
+		"primary-child '{CNTYPE}' Nodes; you must have no more than {EXPNUM} of them",
+
+	'SSM_N_ASDC_MUDI_NON_DISTINCT' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{NTYPE}' Node with Id '{NID}'; ".
+		"a deferrable constraint was violated; ".
+		"at least two of its child Nodes have identical attribute set values ('{VALUES}') ".
+		"with respect to the mutual-distinct child group '{MUDI}'; you must change ".
+		"either the '{C1NTYPE}' Node with Id '{C1NID}' or the '{C2NTYPE}' Node with Id '{C2NID}'",
+	'SSM_N_ASDC_MUDI_NON_DISTINCT_PSN' => 
+		"$CN.assert_deferrable_constraints(): concerning the '{PSNTYPE}' pseudo-Node; ".
+		"a deferrable constraint was violated; ".
+		"at least two of its child Nodes have identical attribute set values ('{VALUES}') ".
+		"with respect to the mutual-distinct child group '{MUDI}'; you must change ".
+		"either the '{C1NTYPE}' Node with Id '{C1NID}' or the '{C2NTYPE}' Node with Id '{C2NID}'",
 );
 
 ######################################################################

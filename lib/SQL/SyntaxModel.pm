@@ -10,10 +10,9 @@ package SQL::SyntaxModel;
 use 5.006;
 use strict;
 use warnings;
-use vars qw($VERSION);
-$VERSION = '0.40';
+our $VERSION = '0.41';
 
-use Locale::KeyedText 0.06;
+use Locale::KeyedText 0.07;
 
 ######################################################################
 
@@ -25,7 +24,7 @@ Standard Modules: I<none>
 
 Nonstandard Modules: 
 
-	Locale::KeyedText 0.06 (for error messages)
+	Locale::KeyedText 0.07 (for error messages)
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -81,10 +80,10 @@ my $CPROP_NEXT_FREE_NIDS = 'next_free_nids'; # hash (enum,id); next free node id
 	# is one higher than the highest Node ID that is or was in use by a Node in this Container.
 my $CPROP_DEF_CON_TESTED = 'def_con_tested'; # boolean - true by def, false when changes made
 	# This property is a status flag which says there have been no changes to the Nodes 
-	# in this Container since the last time test_deferrable_constraints() passed its tests, 
+	# in this Container since the last time assert_deferrable_constraints() passed its tests, 
 	# and so the current Nodes are still valid.  It is used internally by 
-	# test_deferrable_constraints() to make code faster by avoiding un-necessary 
-	# repeated tests from multiple external Container.test_deferrable_constraints() calls.
+	# assert_deferrable_constraints() to make code faster by avoiding un-necessary 
+	# repeated tests from multiple external Container.assert_deferrable_constraints() calls.
 	# It is set true on a new empty Container, and set false when any Nodes are moved in 
 	# or out of the "well known" state within that Container, or are changed while in that state.
 #my $CPROP_CURR_NODE = 'curr_node'; # ref to a Node; used when "streaming" to or from XML
@@ -176,7 +175,7 @@ my %ENUMERATED_TYPES = (
 		CROSS INNER LEFT RIGHT FULL
 	) },
 	'view_part' => { map { ($_ => 1) } qw(
-		RESULT INTO SET FROM WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
+		RESULT SET FROM WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
 	) },
 	'basic_expr_type' => { map { ($_ => 1) } qw(
 		LIT CAST COL MCOL VARG ARG VAR SEQN CVIEW SFUNC UFUNC LIST
@@ -193,7 +192,7 @@ my %ENUMERATED_TYPES = (
 		SCALAR RECORD ARRAY CURSOR
 	) },
 	'routine_type' => { map { ($_ => 1) } qw(
-		ANONYMOUS PACKAGE TRIGGER PROCEDURE FUNCTION BLOCK
+		PACKAGE TRIGGER PROCEDURE FUNCTION BLOCK
 	) },
 	'basic_trigger_event' => { map { ($_ => 1) } qw(
 		BEFR_INS AFTR_INS INST_INS 
@@ -269,6 +268,16 @@ my $TPI_LOCAL_ATDPS  = 'local_atdps'; # Array of attributes depended-on by other
 		# 4. an array ref with 0..N elements that are depended-on values, one of which must 
 		# be matched, if depended-on attr is an enum, or which is empty otherwise;
 		# 5. mandatory-flag (boolean).
+my $TPI_CHILD_QUANTS = 'child_quants'; # Array of quantity limits for child Nodes
+	# Each array element is an array ref with 3 elements: 
+	# 1. child-node-type (cstr); 2. range-min (uint); 3. range-max (uint)
+my $TPI_MUDI_ATGPS   = 'mudi_atgps'; # Array of groups of mutually distinct attributes
+	# Each array element is an array ref with 2 elements: 1. mudi-name (cstr); 
+	# 2. an array ref of N elements where each element is an array ref with 4 elements:
+		# 1. child-node-type (cstr);
+		# 2. an array ref with 0..N elements that are names of lit child-node-attrs; 
+		# 3. an array ref with 0..N elements that are names of enum child-node-attrs; 
+		# 4. an array ref with 0..N elements that are names of nref child-node-attrs.
 
 # Names of special "pseudo-nodes" that are used in an XML version of this structure.
 my $SQLSM_L1_ROOT_PSND = 'root';
@@ -279,6 +288,39 @@ my $SQLSM_L2_SITE_PSND = 'sites';
 my $SQLSM_L2_CIRC_PSND = 'circumventions';
 my @L2_PSEUDONODE_LIST = ($SQLSM_L2_ELEM_PSND, $SQLSM_L2_BLPR_PSND, 
 	$SQLSM_L2_TOOL_PSND, $SQLSM_L2_SITE_PSND, $SQLSM_L2_CIRC_PSND);
+# This hash is used like the subsequent %NODE_TYPES for specific purposes.
+my %PSEUDONODE_TYPES = (
+	$SQLSM_L1_ROOT_PSND => {
+	},
+	$SQLSM_L2_ELEM_PSND => {
+	},
+	$SQLSM_L2_BLPR_PSND => {
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['catalog',['name'],[],[]],
+				['application',['name'],[],[]],
+			]],
+		],
+	},
+	$SQLSM_L2_TOOL_PSND => {
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['data_storage_product',['name'],[],[]],
+				['data_link_product',['name'],[],[]],
+			]],
+		],
+	},
+	$SQLSM_L2_SITE_PSND => {
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['catalog_instance',['name'],[],[]],
+				['application_instance',['name'],[],[]],
+			]],
+		],
+	},
+	$SQLSM_L2_CIRC_PSND => {
+	},
+);
 
 # These are the allowed Node types, with their allowed attributes and their 
 # allowed child Node types.  They are used for method input checking and 
@@ -292,6 +334,13 @@ my %NODE_TYPES = (
 			'name' => 'cstr',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_BLPR_PSND,
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['catalog_link',['name'],[],[]],
+				['schema',['name'],[],[]],
+				['role',['name'],[],[]],
+			]],
+		],
 	},
 	'application' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -301,6 +350,14 @@ my %NODE_TYPES = (
 			'name' => 'cstr',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_BLPR_PSND,
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['catalog_link',['name'],[],[]],
+				['view',['name'],[],[]],
+				['routine',['name'],[],[]],
+				['command',['name'],[],[]],
+			]],
+		],
 	},
 	'owner' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -339,6 +396,15 @@ my %NODE_TYPES = (
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
 		$TPI_MA_ATTRS => [[qw( name )],[],[qw( owner )]],
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['domain',['name'],[],[]],
+				['sequence',['name'],[],[]],
+				['table',['name'],[],[]],
+				['view',['name'],[],[]],
+				['routine',['name'],[],[]],
+			]],
+		],
 	},
 	'role' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -368,6 +434,11 @@ my %NODE_TYPES = (
 		$TPI_P_NODE_ATNMS => [qw( role )],
 		$TPI_MUTEX_ATGPS => [
 			['privilege_on',[],[],[qw( schema domain sequence table routine )],1],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_option',[
+				['privilege_for',[],['priv_type'],[]],
+			]],
 		],
 	},
 	'privilege_for' => {
@@ -440,6 +511,11 @@ my %NODE_TYPES = (
 				[['num_scale'],[],[],[],0],
 			]],
 		],
+		$TPI_MUDI_ATGPS => [
+			['ak_option',[
+				['domain_opt',['value'],[],[]],
+			]],
+		],
 	},
 	'domain_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -485,6 +561,15 @@ my %NODE_TYPES = (
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema )],
 		$TPI_MA_ATTRS => [[qw( name )],[],[]],
+		$TPI_CHILD_QUANTS => [
+			['table_col',1,undef],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['table_col',['name'],[],[]],
+				['table_ind',['name'],[],[]],
+			]],
+		],
 	},
 	'table_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -528,6 +613,17 @@ my %NODE_TYPES = (
 				[[],[],['f_table'],['FOREIGN','UFOREIGN'],1],
 			]],
 		],
+		$TPI_CHILD_QUANTS => [
+			['table_ind_col',1,undef],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_table_col',[
+				['table_ind_col',[],[],['table_col']],
+			]],
+			['ak_f_table_col',[
+				['table_ind_col',[],[],['f_table_col']],
+			]],
+		],
 	},
 	'table_ind_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -543,7 +639,7 @@ my %NODE_TYPES = (
 	},
 	'view' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id view_type schema name application routine p_view 
+			id view_type schema application routine p_view name 
 			match_all_cols compound_op distinct_rows may_write 
 		)],
 		$TPI_AT_LITERALS => {
@@ -568,6 +664,33 @@ my %NODE_TYPES = (
 			[undef,'view_type',undef,[
 				[['match_all_cols'],[],[],['MATCH'],0],
 				[[],['compound_op'],[],['COMPOUND'],1],
+			]],
+		],
+		$TPI_CHILD_QUANTS => [
+			['view_hierarchy',0,1],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['view_arg',['name'],[],[]],
+				['view_col',['name'],[],[]],
+			]],
+			['ak_src_name',[
+				['view_src',['name'],[],[]],
+			]],
+			['ak_join',[
+				['view_join',[],[],['lhs_src','rhs_src']],
+			]],
+			['ak_join_limit_one',[
+				['view_join',[],[],['rhs_src']],
+			]],
+			['ak_expr_result_col',[
+				['view_expr',[],[],['view_col']],
+			]],
+			['ak_expr_set_col',[
+				['view_expr',[],[],['set_view_col']],
+			]],
+			['ak_expr_from_src_arg',[
+				['view_expr',[],[],['view_src_arg']],
 			]],
 		],
 	},
@@ -604,6 +727,14 @@ my %NODE_TYPES = (
 		$TPI_MUTEX_ATGPS => [
 			['match',[],[],[qw( match_table match_view )],1],
 		],
+		$TPI_MUDI_ATGPS => [
+			['ak_table_col',[
+				['view_src_col',[],[],['match_table_col']],
+			]],
+			['ak_view_col',[
+				['view_src_col',[],[],['match_view_col']],
+			]],
+		],
 	},
 	'view_src_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -632,7 +763,7 @@ my %NODE_TYPES = (
 	},
 	'view_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id view name domain src_col 
+			id view name domain set_routine_arg set_routine_var src_col 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -640,10 +771,15 @@ my %NODE_TYPES = (
 		$TPI_AT_NREFS => {
 			'view' => 'view',
 			'domain' => 'domain',
+			'set_routine_arg' => 'routine_arg',
+			'set_routine_var' => 'routine_var',
 			'src_col' => 'view_src_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
 		$TPI_MA_ATTRS => [[qw( name )],[],[qw( domain )]],
+		$TPI_MUTEX_ATGPS => [
+			['select_into',[],[],[qw( set_routine_arg set_routine_var )],0],
+		],
 	},
 	'view_join' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -659,6 +795,17 @@ my %NODE_TYPES = (
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
 		$TPI_MA_ATTRS => [[],[qw( join_type )],[qw( lhs_src rhs_src )]],
+		$TPI_CHILD_QUANTS => [
+			['view_join_col',1,undef],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_lhs_col',[
+				['view_join_col',[],[],['lhs_src_col']],
+			]],
+			['ak_rhs_col',[
+				['view_join_col',[],[],['rhs_src_col']],
+			]],
+		],
 	},
 	'view_join_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -710,8 +857,7 @@ my %NODE_TYPES = (
 	},
 	'view_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id expr_type p_expr view view_part 
-			view_col set_routine_arg set_routine_var set_view_col view_src_arg 
+			id expr_type p_expr view view_part view_col set_view_col view_src_arg 
 			domain lit_val src_col match_col view_arg routine_arg routine_var sequence 
 			call_view call_view_arg call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
@@ -727,8 +873,6 @@ my %NODE_TYPES = (
 			'p_expr' => 'view_expr',
 			'view' => 'view',
 			'view_col' => 'view_col',
-			'set_routine_arg' => 'routine_arg',
-			'set_routine_var' => 'routine_var',
 			'set_view_col' => 'view_src_col',
 			'view_src_arg' => 'view_src_arg',
 			'domain' => 'domain',
@@ -754,8 +898,7 @@ my %NODE_TYPES = (
 		],
 		$TPI_LOCAL_ATDPS => [
 			[undef,'view_part',undef,[
-				[[],[],['view_col'],['RESULT','INTO'],1],
-				[[],[],['set_routine_arg','set_routine_var'],['INTO'],1],
+				[[],[],['view_col'],['RESULT'],1],
 				[[],[],['set_view_col'],['SET'],1],
 				[[],[],['view_src_arg'],['FROM'],1],
 			]],
@@ -776,11 +919,19 @@ my %NODE_TYPES = (
 				[[],[],['catalog_link'],[],0],
 			]],
 		],
+		$TPI_MUDI_ATGPS => [
+			['ak_view_arg',[
+				['view_expr',[],[],['call_view_arg']],
+			]],
+			['ak_ufunc_arg',[
+				['view_expr',[],[],['call_ufunc_arg']],
+			]],
+		],
 	},
 	'routine' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine_type schema application p_routine table view 
-			name return_var_type return_domain trigger_event trigger_per_stmt
+			id routine_type schema application p_routine name return_var_type return_domain 
+			trigger_on_table trigger_on_view trigger_event trigger_per_stmt
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -795,20 +946,30 @@ my %NODE_TYPES = (
 			'schema' => 'schema',
 			'application' => 'application',
 			'p_routine' => 'routine',
-			'table' => 'table',
-			'view' => 'view',
 			'return_domain' => 'domain',
+			'trigger_on_table' => 'table',
+			'trigger_on_view' => 'view',
 		},
-		$TPI_P_NODE_ATNMS => [qw( schema application p_routine table view )],
+		$TPI_P_NODE_ATNMS => [qw( schema application p_routine )],
 		$TPI_MA_ATTRS => [[qw( name )],[qw( routine_type )],[]],
 		$TPI_LOCAL_ATDPS => [
 			[undef,'routine_type',undef,[
-				[[],['return_var_type'],[],['ANONYMOUS','FUNCTION'],0], # TODO: make mandatory for FUNCTION only
+				[[],['return_var_type'],[],['FUNCTION'],1],
+				[[],[],['trigger_on_table','trigger_on_view'],['TRIGGER'],1],
 				[[],['trigger_event'],[],['TRIGGER'],1],
 				[['trigger_per_stmt'],[],[],['TRIGGER'],1],
 			]],
 			[undef,'return_var_type',undef,[
 				[[],[],['return_domain'],['SCALAR'],1],
+			]],
+		],
+		$TPI_CHILD_QUANTS => [
+			['routine_stmt',1,undef],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_name',[
+				['routine_arg',['name'],[],[]],
+				['routine_var',['name'],[],[]],
 			]],
 		],
 	},
@@ -902,11 +1063,16 @@ my %NODE_TYPES = (
 				[[],[],['catalog_link'],[],0],
 			]],
 		],
+		$TPI_MUDI_ATGPS => [
+			['ak_uproc_arg',[
+				['routine_expr',[],[],['call_uproc_arg']],
+			]],
+		],
 	},
 	'routine_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id expr_type p_expr p_stmt domain lit_val routine_arg routine_var sequence 
-			call_sfunc call_ufunc call_ufunc_arg catalog_link
+			call_sfunc call_ufunc call_ufunc_arg call_uproc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
 			'lit_val' => 'cstr',
@@ -924,6 +1090,7 @@ my %NODE_TYPES = (
 			'sequence' => 'sequence',
 			'call_ufunc' => 'routine',
 			'call_ufunc_arg' => 'routine_arg',
+			'call_uproc_arg' => 'routine_arg',
 			'catalog_link' => 'catalog_link',
 		},
 		$TPI_P_NODE_ATNMS => [qw( p_expr p_stmt )],
@@ -946,6 +1113,11 @@ my %NODE_TYPES = (
 				[[],[],['catalog_link'],[],0],
 			]],
 		],
+		$TPI_MUDI_ATGPS => [
+			['ak_ufunc_arg',[
+				['routine_expr',[],[],['call_ufunc_arg']],
+			]],
+		],
 	},
 	'command' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -962,6 +1134,9 @@ my %NODE_TYPES = (
 		},
 		$TPI_P_NODE_ATNMS => [qw( application )],
 		$TPI_MA_ATTRS => [[],[qw( command_type )],[]],
+		$TPI_CHILD_QUANTS => [
+			['command_arg',0,2],
+		],
 	},
 	'command_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -986,11 +1161,12 @@ my %NODE_TYPES = (
 	},
 	'data_storage_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id name product_code is_file_based is_local_proc is_network_svc
+			id name product_code is_memory_based is_file_based is_local_proc is_network_svc
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
 			'product_code' => 'cstr',
+			'is_memory_based' => 'bool',
 			'is_file_based' => 'bool',
 			'is_local_proc' => 'bool',
 			'is_network_svc' => 'bool',
@@ -998,7 +1174,7 @@ my %NODE_TYPES = (
 		$TPI_P_PSEUDONODE => $SQLSM_L2_TOOL_PSND,
 		$TPI_MA_ATTRS => [[qw( product_code )],[],[]],
 		$TPI_MUTEX_ATGPS => [
-			['type',[qw( is_file_based is_local_proc is_network_svc )],[],[],1],
+			['type',[qw( is_memory_based is_file_based is_local_proc is_network_svc )],[],[],1],
 		],
 	},
 	'data_link_product' => {
@@ -1015,14 +1191,18 @@ my %NODE_TYPES = (
 	},
 	'catalog_instance' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id product blueprint name server_ip server_domain server_port file_path
+			id product blueprint name file_path server_ip server_domain server_port
+			local_dsn login_user login_pass
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
+			'file_path' => 'cstr',
 			'server_ip' => 'cstr',
 			'server_domain' => 'cstr',
 			'server_port' => 'uint',
-			'file_path' => 'cstr',
+			'local_dsn' => 'cstr',
+			'login_user' => 'cstr',
+			'login_pass' => 'cstr',
 		},
 		$TPI_AT_NREFS => {
 			'product' => 'data_storage_product',
@@ -1030,6 +1210,14 @@ my %NODE_TYPES = (
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_SITE_PSND,
 		$TPI_MA_ATTRS => [[],[],[qw( product blueprint )]],
+		$TPI_MUDI_ATGPS => [
+			['ak_option',[
+				['catalog_instance_opt',['key'],[],[]],
+			]],
+			['ak_user_name',[
+				['user',['name'],[],[]],
+			]],
+		],
 	},
 	'catalog_instance_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1081,6 +1269,14 @@ my %NODE_TYPES = (
 			['link_root_unrealized',[],[],[qw( p_link unrealized )],1],
 			['link_root_target',[],[],[qw( p_link target )],1],
 		],
+		$TPI_CHILD_QUANTS => [
+			['catalog_link_instance',0,1],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_option',[
+				['catalog_link_instance_opt',['key'],[],[]],
+			]],
+		],
 	},
 	'catalog_link_instance_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1119,6 +1315,11 @@ my %NODE_TYPES = (
 				[[],[],['match_owner'],['SCHEMA_OWNER'],1],
 				[['name'],[],[],['ROOT','SCHEMA_OWNER','DATA_EDITOR'],1],
 				[['password'],[],[],['ROOT','SCHEMA_OWNER','DATA_EDITOR'],1],
+			]],
+		],
+		$TPI_MUDI_ATGPS => [
+			['ak_role',[
+				['user_role',[],[],['role']],
 			]],
 		],
 	},
@@ -1344,6 +1545,11 @@ sub _throw_error_message {
 	# Throws an exception consisting of an object.  A Container property is not 
 	# used to store object so things work properly in multi-threaded environment; 
 	# an exception is only supposed to affect the thread that calls it.
+	if( ref($self) and UNIVERSAL::isa( $self, 'SQL::SyntaxModel::Node' ) ) {
+		ref($args) eq 'HASH' or $args = {};
+		$args->{'NTYPE'} = $self->{$NPROP_NODE_TYPE};
+		$args->{'NID'} = $self->{$NPROP_NODE_ID};
+	}
 	die Locale::KeyedText->new_message( $error_code, $args );
 }
 
@@ -1396,7 +1602,7 @@ sub get_node {
 	defined( $node_type ) or $container->_throw_error_message( 'SSM_C_GET_NODE_NO_ARG_TYPE' );
 	defined( $node_id ) or $container->_throw_error_message( 'SSM_C_GET_NODE_NO_ARG_ID' );
 	unless( $NODE_TYPES{$node_type} ) {
-		$container->_throw_error_message( 'SSM_C_GET_NODE_BAD_TYPE', { 'TYPE' => $node_type } );
+		$container->_throw_error_message( 'SSM_C_GET_NODE_BAD_TYPE', { 'ARGNTYPE' => $node_type } );
 	}
 	return( $container->{$CPROP_ALL_NODES}->{$node_type}->{$node_id} );
 }
@@ -1408,7 +1614,7 @@ sub get_child_nodes {
 	my $pseudonodes = $container->{$CPROP_PSEUDONODES};
 	if( defined( $node_type ) ) {
 		unless( $NODE_TYPES{$node_type} ) {
-			$container->_throw_error_message( 'SSM_C_GET_CH_NODES_BAD_TYPE', { 'TYPE' => $node_type } );
+			$container->_throw_error_message( 'SSM_C_GET_CH_NODES_BAD_TYPE', { 'ARGNTYPE' => $node_type } );
 		}
 		my $p_pseudonode = $NODE_TYPES{$node_type}->{$TPI_P_PSEUDONODE} or return( [] );
 		return( [grep { $_->{$NPROP_NODE_TYPE} eq $node_type } @{$pseudonodes->{$p_pseudonode}}] );
@@ -1423,7 +1629,7 @@ sub get_next_free_node_id {
 	my ($container, $node_type) = @_;
 	defined( $node_type ) or $container->_throw_error_message( 'SSM_C_GET_NFNI_NO_ARG_TYPE' );
 	unless( $NODE_TYPES{$node_type} ) {
-		$container->_throw_error_message( 'SSM_C_GET_NFNI_BAD_TYPE', { 'TYPE' => $node_type } );
+		$container->_throw_error_message( 'SSM_C_GET_NFNI_BAD_TYPE', { 'ARGNTYPE' => $node_type } );
 	}
 	return( $container->{$CPROP_NEXT_FREE_NIDS}->{$node_type} );
 }
@@ -1434,23 +1640,25 @@ sub deferrable_constraints_are_tested {
 	return( $_[0]->{$CPROP_DEF_CON_TESTED} );
 }
 
-sub test_deferrable_constraints {
+sub assert_deferrable_constraints {
 	my ($container) = @_;
 	if( $container->{$CPROP_DEF_CON_TESTED} ) {
 		return( 1 );
 	}
 	# Test nodes in the same order that they appear in the Node tree.
-	foreach my $pseudonode (@L2_PSEUDONODE_LIST) {
-		foreach my $child_node (@{$container->{$CPROP_PSEUDONODES}->{$pseudonode}}) {
-			$container->_test_deferrable_constraints( $child_node );
+	foreach my $pseudonode_name (@L2_PSEUDONODE_LIST) {
+		SQL::SyntaxModel::Node->_assert_child_comp_deferrable_constraints(
+			$pseudonode_name, $container->{$CPROP_PSEUDONODES}->{$pseudonode_name} );
+		foreach my $child_node (@{$container->{$CPROP_PSEUDONODES}->{$pseudonode_name}}) {
+			$container->_assert_deferrable_constraints( $child_node );
 		}
 	}
 	$container->{$CPROP_DEF_CON_TESTED} = 1;
 }
 
-sub _test_deferrable_constraints {
+sub _assert_deferrable_constraints {
 	my ($container, $node) = @_;
-	$node->test_deferrable_constraints();
+	$node->assert_deferrable_constraints();
 	my %children_were_output = ();
 	foreach my $child_node (@{$node->{$NPROP_CHILD_NODES}}) {
 		if( my $child_p_node_atnm = $child_node->{$NPROP_P_NODE_ATNM} ) {
@@ -1458,8 +1666,8 @@ sub _test_deferrable_constraints {
 				if( $child_main_parent eq $node ) {
 					# Only nav to child if we are its primary parent, not simply any parent.
 					unless( $children_were_output{$child_node} ) {
-						# Only nav to child once; a child may link to same parent multiple times.
-						$container->_test_deferrable_constraints( $child_node );
+						# Only nav to child once; a child may link to primary parent multiple times.
+						$container->_assert_deferrable_constraints( $child_node );
 						$children_were_output{$child_node} = 1;
 					}
 				}
@@ -1467,7 +1675,7 @@ sub _test_deferrable_constraints {
 		} else { # !$child_node->{$NPROP_P_NODE_ATNM}
 			# Make sure to report error condition that primary parent attribute name not set, 
 			# assuming this Node can't alternately have a pseudonode primary parent.
-			$child_node->test_deferrable_constraints();
+			$child_node->assert_deferrable_constraints();
 		}
 	}
 }
@@ -1515,7 +1723,7 @@ sub new {
 	defined( $node_type ) or $node->_throw_error_message( 'SSM_N_NEW_NODE_NO_ARGS' );
 	my $type_info = $NODE_TYPES{$node_type};
 	unless( $type_info ) {
-		$node->_throw_error_message( 'SSM_N_NEW_NODE_BAD_TYPE', { 'TYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_NEW_NODE_BAD_TYPE', { 'ARGNTYPE' => $node_type } );
 	}
 
 	$node->{$NPROP_NODE_TYPE} = $node_type;
@@ -1562,8 +1770,7 @@ sub get_node_id {
 sub clear_node_id {
 	my ($node) = @_;
 	if( $node->{$NPROP_CONTAINER} ) {
-		$node->_throw_error_message( 'SSM_N_CLEAR_NODE_ID_IN_CONT', 
-			{ 'ID' => $node->{$NPROP_NODE_ID}, 'TYPE' => $node->{$NPROP_NODE_TYPE} } );
+		$node->_throw_error_message( 'SSM_N_CLEAR_NODE_ID_IN_CONT' );
 	}
 	$node->{$NPROP_NODE_ID} = undef;
 }
@@ -1592,8 +1799,7 @@ sub set_node_id {
 	my $rh_cnl_ft = $node->{$NPROP_CONTAINER}->{$CPROP_ALL_NODES}->{$node_type};
 
 	if( $rh_cnl_ft->{$new_id} ) {
-		$node->_throw_error_message( 'SSM_N_SET_NODE_ID_DUPL_ID', 
-			{ 'ID' => $new_id, 'TYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_SET_NODE_ID_DUPL_ID', { 'ARG' => $new_id } );
 	}
 
 	# The following seq should leave state consistant or recoverable if the thread dies
@@ -1620,8 +1826,7 @@ sub expected_literal_attribute_type {
 	my $exp_lit_type = $NODE_TYPES{$node_type}->{$TPI_AT_LITERALS} && 
 		$NODE_TYPES{$node_type}->{$TPI_AT_LITERALS}->{$attr_name};
 	unless( $exp_lit_type ) {
-		$node->_throw_error_message( 'SSM_N_EXP_LIT_AT_INVAL_NM', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_EXP_LIT_AT_INVAL_NM', { 'ATNM' => $attr_name } );
 	}
 	return( $exp_lit_type );
 }
@@ -1663,21 +1868,21 @@ sub set_literal_attribute {
 	if( $exp_lit_type eq 'bool' ) {
 		if( $attr_value ne '0' and $attr_value ne '1' ) {
 			$node->_throw_error_message( 'SSM_N_SET_LIT_AT_INVAL_V_BOOL', 
-				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'VAL' => $attr_value } );
+				{ 'ATNM' => $attr_name, 'ARG' => $attr_value } );
 		}
 
 	} elsif( $exp_lit_type eq 'uint' ) {
 		if( $attr_value =~ /\D/ or $attr_value < 0 or int($attr_value) ne $attr_value ) {
 			# The regexp above should suppress warnings about non-numerical arguments to '<'
 			$node->_throw_error_message( 'SSM_N_SET_LIT_AT_INVAL_V_UINT', 
-				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'VAL' => $attr_value } );
+				{ 'ATNM' => $attr_name, 'ARG' => $attr_value } );
 		}
 
 	} elsif( $exp_lit_type eq 'sint' ) {
 		if( $attr_value =~ /\D/ or int($attr_value) ne $attr_value ) {
 			# The regexp above should suppress warnings about non-numerical arguments to '<'
 			$node->_throw_error_message( 'SSM_N_SET_LIT_AT_INVAL_V_SINT', 
-				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'VAL' => $attr_value } );
+				{ 'ATNM' => $attr_name, 'ARG' => $attr_value } );
 		}
 
 	} else {} # $exp_lit_type eq 'cstr' or 'misc'; no change to value needed
@@ -1708,8 +1913,7 @@ sub expected_enumerated_attribute_type {
 	my $exp_enum_type = $NODE_TYPES{$node_type}->{$TPI_AT_ENUMS} && 
 		$NODE_TYPES{$node_type}->{$TPI_AT_ENUMS}->{$attr_name};
 	unless( $exp_enum_type ) {
-		$node->_throw_error_message( 'SSM_N_EXP_ENUM_AT_INVAL_NM', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_EXP_ENUM_AT_INVAL_NM', { 'ATNM' => $attr_name } );
 	}
 	return( $exp_enum_type );
 }
@@ -1747,9 +1951,8 @@ sub set_enumerated_attribute {
 	defined( $attr_value ) or $node->_throw_error_message( 'SSM_N_SET_ENUM_AT_NO_ARG_VAL' );
 
 	unless( $ENUMERATED_TYPES{$exp_enum_type}->{$attr_value} ) {
-		$node->_throw_error_message( 'SSM_N_SET_ENUM_AT_INVAL_V', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
-			'ENUMTYPE' => $exp_enum_type, 'VAL' => $attr_value } );
+		$node->_throw_error_message( 'SSM_N_SET_ENUM_AT_INVAL_V', { 'ATNM' => $attr_name, 
+			'ENUMTYPE' => $exp_enum_type, 'ARG' => $attr_value } );
 	}
 
 	$node->{$NPROP_AT_ENUMS}->{$attr_name} = $attr_value;
@@ -1778,8 +1981,7 @@ sub expected_node_ref_attribute_type {
 	my $exp_node_type = $NODE_TYPES{$node_type}->{$TPI_AT_NREFS} && 
 		$NODE_TYPES{$node_type}->{$TPI_AT_NREFS}->{$attr_name};
 	unless( $exp_node_type ) {
-		$node->_throw_error_message( 'SSM_N_EXP_NREF_AT_INVAL_NM', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_EXP_NREF_AT_INVAL_NM', { 'ATNM' => $attr_name } );
 	}
 	return( $exp_node_type );
 }
@@ -1839,9 +2041,8 @@ sub set_node_ref_attribute {
 		# We were given a Node object for a new attribute value.
 
 		unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-			$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', 
-				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
-				'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE} } );
+			$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', { 'ATNM' => $attr_name, 
+				'EXPNTYPE' => $exp_node_type, 'ARGNTYPE' => $attr_value->{$NPROP_NODE_TYPE} } );
 		}
 
 		if( $attr_value->{$NPROP_CONTAINER} and $node->{$NPROP_CONTAINER} ) {
@@ -1870,7 +2071,7 @@ sub set_node_ref_attribute {
 			$attr_value = $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value};
 			unless( $attr_value ) {
 				$node->_throw_error_message( 'SSM_N_SET_NREF_AT_NONEX_NID', 
-					{ 'ARG' => $attr_value, 'EXPTYPE' => $exp_node_type } );
+					{ 'ARG' => $attr_value, 'EXPNTYPE' => $exp_node_type } );
 			}
 		}
 	}
@@ -1925,8 +2126,7 @@ sub expected_attribute_major_type {
 	my $node_type = $node->get_node_type();
 	my $namt = $node->major_type_of_node_type_attribute( $node_type, $attr_name );
 	unless( $namt ) {
-		$node->_throw_error_message( 'SSM_N_EXP_AT_MT_INVAL_NM', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_EXP_AT_MT_INVAL_NM', { 'ATNM' => $attr_name } );
 	}
 	return( $namt );
 }
@@ -2037,8 +2237,7 @@ sub set_parent_node_attribute_name {
 	my $node_type = $node->{$NPROP_NODE_TYPE};
 	unless( $NODE_TYPES{$node_type}->{$TPI_P_NODE_ATNMS} and 
 			grep { $_ eq $attr_name } @{$NODE_TYPES{$node_type}->{$TPI_P_NODE_ATNMS}} ) {
-		$node->_throw_error_message( 'SSM_N_SET_P_NODE_ATNM_INVAL_NM', 
-			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_SET_P_NODE_ATNM_INVAL_NM', { 'ATNM' => $attr_name } );
 	}
 	if( defined( $node->{$NPROP_P_NODE_ATNM} ) and
 			$attr_name eq $node->{$NPROP_P_NODE_ATNM} ) {
@@ -2052,7 +2251,7 @@ sub set_parent_node_attribute_name {
 		while( $parent_node = $parent_node->get_parent_node() ) {
 			if( $parent_node eq $node ) {
 				$node->_throw_error_message( 'SSM_N_SET_P_NODE_ATNM_CIRC_REF', 
-					{ 'NAME' => $attr_name } );
+					{ 'ATNM' => $attr_name } );
 			}
 		}
 	}
@@ -2117,8 +2316,7 @@ sub put_in_container {
 	my $node_type = $node->{$NPROP_NODE_TYPE};
 
 	if( $new_container->{$CPROP_ALL_NODES}->{$node_type}->{$node_id} ) {
-		$node->_throw_error_message( 'SSM_N_PI_CONT_DUPL_ID', 
-			{ 'ID' => $node_id, 'TYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_PI_CONT_DUPL_ID' );
 	}
 
 	# Note: No recursion tests are necessary in put_in_container(); any existing Node 
@@ -2138,7 +2336,7 @@ sub put_in_container {
 		my $at_nodes_ref = $rh_cnl_bt->{$at_node_type}->{$at_nodes_nid};
 		unless( $at_nodes_ref ) {
 			$node->_throw_error_message( 'SSM_N_PI_CONT_NONEX_AT_NREF', 
-				{ 'ATNM' => $at_nodes_atnm, 'TYPE' => $at_node_type, 'ID' => $at_nodes_nid } );
+				{ 'ATNM' => $at_nodes_atnm, 'EXPNTYPE' => $at_node_type, 'EXPNID' => $at_nodes_nid } );
 		}
 		$at_nodes_refs{$at_nodes_atnm} = $at_nodes_ref;
 	}
@@ -2307,7 +2505,7 @@ sub get_child_nodes {
 	my ($node, $node_type) = @_;
 	if( defined( $node_type ) ) {
 		unless( $NODE_TYPES{$node_type} ) {
-			$node->_throw_error_message( 'SSM_N_GET_CH_NODES_BAD_TYPE', { 'TYPE' => $node_type } );
+			$node->_throw_error_message( 'SSM_N_GET_CH_NODES_BAD_TYPE' );
 		}
 		return( [grep { $_->{$NPROP_NODE_TYPE} eq $node_type } @{$node->{$NPROP_CHILD_NODES}}] );
 	} else {
@@ -2343,30 +2541,42 @@ sub add_child_nodes {
 
 ######################################################################
 
-sub test_deferrable_constraints {
+sub assert_deferrable_constraints {
 	my ($node) = @_;
-	my $node_type = $node->{$NPROP_NODE_TYPE};
-	my $node_id = $node->{$NPROP_NODE_ID};
-	my $type_info = $NODE_TYPES{$node_type};
+	# Only "Well Known" Nodes would get this invoked by Container.assert_deferrable_constraints().
+	# "Alone","At Home" Nodes only get here when Node.assert_deferrable_constraints() 
+	# is invoked directly by external code.
+	$node->_assert_in_node_deferrable_constraints(); # can call on Alone, At Home, Well Known
+	if( $node->{$NPROP_CONTAINER} ) {
+		if( $node->{$NPROP_LINKS_RECIP} ) {
+			$node->_assert_child_comp_deferrable_constraints(
+				undef, $node->get_child_nodes() ); # call on Well Known only
+		}
+	}
+}
 
-	# 1: Now test constraints associated with Node-type details given in each 
+sub _assert_in_node_deferrable_constraints {
+	# All assertions that can be performed on Nodes of all statuses are done in this method.
+	my ($node) = @_;
+	my $type_info = $NODE_TYPES{$node->{$NPROP_NODE_TYPE}};
+
+	# 1: Now assert constraints associated with Node-type details given in each 
 	# "Attribute List" section of Language.pod.
 
 	# 1.1: Assert that the NODE_ID attribute is set.
-	unless( defined( $node_id ) ) {
-		# This can only possibly fail at deferred-constraint assertion time with "Alone" Nodes; 
+	unless( defined( $node->{$NPROP_NODE_ID} ) ) {
+		# This can only possibly fail at deferrable-constraint assertion time with "Alone" Nodes; 
 		# it is always-enforced for "At Home" and "Well Known" Nodes.
-		$node->_throw_error_message( 'SSM_N_TEDC_NID_VAL_NO_SET', { 'HOSTTYPE' => $node_type } );
+		$node->_throw_error_message( 'SSM_N_ASDC_NID_VAL_NO_SET' );
 	}
 
 	# 1.2: Assert that a Node which can have a Node primary-parent does in fact have one.
 	if( !$type_info->{$TPI_P_PSEUDONODE} and !$node->{$NPROP_P_NODE_ATNM} ) {
-		$node->_throw_error_message( 'SSM_N_TEDC_P_NODE_ATNM_NOT_SET', 
-			{ 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+		$node->_throw_error_message( 'SSM_N_ASDC_P_NODE_ATNM_NOT_SET' );
 	}
 
 	# 1.3: Assert that exactly one primary parent ("PP") Node attribute is set.
-	if( my $p_node_atnms = $NODE_TYPES{$node_type}->{$TPI_P_NODE_ATNMS} ) {
+	if( my $p_node_atnms = $type_info->{$TPI_P_NODE_ATNMS} ) {
 		my @valued_candidates = ();
 		foreach my $attr_name (@{$p_node_atnms}) {
 			if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
@@ -2374,14 +2584,13 @@ sub test_deferrable_constraints {
 			}
 		}
 		if( scalar( @valued_candidates ) > 1 ) {
-			$node->_throw_error_message( 'SSM_N_TEDC_PP_TOO_MANY_SET', 
-				{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-				'NUMVALS' => scalar( @valued_candidates ), 'ATNMS' => "@valued_candidates" } );
+			$node->_throw_error_message( 'SSM_N_ASDC_PP_TOO_MANY_SET', 
+				{ 'NUMVALS' => scalar( @valued_candidates ), 'ATNMS' => "@valued_candidates" } );
 		}
 		if( scalar( @valued_candidates ) == 0 ) {
 			my @possible_candidates = @{$p_node_atnms};
-			$node->_throw_error_message( 'SSM_N_TEDC_PP_ZERO_SET', 
-				{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNMS' => "@possible_candidates" } );
+			$node->_throw_error_message( 'SSM_N_ASDC_PP_ZERO_SET', 
+				{ 'ATNMS' => "@possible_candidates" } );
 		}
 	}
 
@@ -2390,28 +2599,25 @@ sub test_deferrable_constraints {
 		my ($lits, $enums, $nrefs) = @{$mand_attrs};
 		foreach my $attr_name (@{$lits}) {
 			unless( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEDC_MA_LIT_VAL_NO_SET', 
-					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
+				$node->_throw_error_message( 'SSM_N_ASDC_MA_LIT_VAL_NO_SET', { 'ATNM' => $attr_name } );
 			}
 		}
 		foreach my $attr_name (@{$enums}) {
 			unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEDC_MA_ENUM_VAL_NO_SET', 
-					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
+				$node->_throw_error_message( 'SSM_N_ASDC_MA_ENUM_VAL_NO_SET', { 'ATNM' => $attr_name } );
 			}
 		}
 		foreach my $attr_name (@{$nrefs}) {
 			unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-				$node->_throw_error_message( 'SSM_N_TEDC_MA_NREF_VAL_NO_SET', 
-					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
+				$node->_throw_error_message( 'SSM_N_ASDC_MA_NREF_VAL_NO_SET', { 'ATNM' => $attr_name } );
 			}
 		}
 	}
 
-	# 2: Now test constraints associated with Node-type details given in each 
+	# 2: Now assert constraints associated with Node-type details given in each 
 	# "Exclusive Attribute Groups List" section of Language.pod.
 
-	if( my $mutex_atgps = $NODE_TYPES{$node_type}->{$TPI_MUTEX_ATGPS} ) {
+	if( my $mutex_atgps = $type_info->{$TPI_MUTEX_ATGPS} ) {
 		foreach my $mutex_atgp (@{$mutex_atgps}) {
 			my ($mutex_name, $lits, $enums, $nrefs, $is_mandatory) = @{$mutex_atgp};
 			my @valued_candidates = ();
@@ -2431,26 +2637,24 @@ sub test_deferrable_constraints {
 				}
 			}
 			if( scalar( @valued_candidates ) > 1 ) {
-				$node->_throw_error_message( 'SSM_N_TEDC_MUTEX_TOO_MANY_SET', 
-					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-					'NUMVALS' => scalar( @valued_candidates ), 
+				$node->_throw_error_message( 'SSM_N_ASDC_MUTEX_TOO_MANY_SET', 
+					{ 'NUMVALS' => scalar( @valued_candidates ), 
 					'ATNMS' => "@valued_candidates", 'MUTEX' => $mutex_name } );
 			}
 			if( scalar( @valued_candidates ) == 0 ) {
 				if( $is_mandatory ) {
 					my @possible_candidates = (@{$lits}, @{$enums}, @{$nrefs});
-					$node->_throw_error_message( 'SSM_N_TEDC_MUTEX_ZERO_SET', 
-						{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-						'ATNMS' => "@possible_candidates", 'MUTEX' => $mutex_name } );
+					$node->_throw_error_message( 'SSM_N_ASDC_MUTEX_ZERO_SET', 
+						{ 'ATNMS' => "@possible_candidates", 'MUTEX' => $mutex_name } );
 				}
 			}
 		}
 	}
 
-	# 3: Now test constraints associated with Node-type details given in each 
+	# 3: Now assert constraints associated with Node-type details given in each 
 	# "Local Attribute Dependencies List" section of Language.pod.
 
-	if( my $local_atdps_list = $NODE_TYPES{$node_type}->{$TPI_LOCAL_ATDPS} ) {
+	if( my $local_atdps_list = $type_info->{$TPI_LOCAL_ATDPS} ) {
 		foreach my $local_atdps_item (@{$local_atdps_list}) {
 			my ($dep_on_lit_nm, $dep_on_enum_nm, $dep_on_nref_nm, $dependencies) = @{$local_atdps_item};
 			foreach my $dependency (@{$dependencies}) {
@@ -2476,9 +2680,9 @@ sub test_deferrable_constraints {
 					if( !defined( $dep_on_attr_val ) ) {
 						# The dependency is undef/null, so all dependents must be undef/null.
 						if( scalar( @valued_dependents ) > 0 ) {
-							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
-								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_lit_nm,
-								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+							$node->_throw_error_message( 'SSM_N_ASDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'DEP_ON' => $dep_on_lit_nm, 'NUMVALS' => scalar( @valued_dependents ), 
+								'ATNMS' => "@valued_dependents" } );
 						}
 					} else {
 						# The dependency is valued, so a dependent may be set.
@@ -2494,34 +2698,32 @@ sub test_deferrable_constraints {
 					if( !defined( $dep_on_attr_val ) ) {
 						# The dependency is undef/null, so all dependents must be undef/null.
 						if( scalar( @valued_dependents ) > 0 ) {
-							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
-								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
-								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+							$node->_throw_error_message( 'SSM_N_ASDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'DEP_ON' => $dep_on_enum_nm, 'NUMVALS' => scalar( @valued_dependents ), 
+								'ATNMS' => "@valued_dependents" } );
 						}
 						# If we get here, the tests have passed concerning this $dependency.
 					} elsif( !scalar( grep { $_ eq $dep_on_attr_val } @{$dep_on_enum_vals} ) ) {
 						# The dependency has the wrong value for these dependents; the latter must be undef/null.
 						if( scalar( @valued_dependents ) > 0 ) {
-							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_HAS_WRONG_VAL', 
-								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
-								'DEP_ON_VAL' => $dep_on_attr_val, 
+							$node->_throw_error_message( 'SSM_N_ASDC_LATDP_DEP_ON_HAS_WRONG_VAL', 
+								{ 'DEP_ON' => $dep_on_enum_nm, 'DEP_ON_VAL' => $dep_on_attr_val, 
 								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
 						}
 						# If we get here, the tests have passed concerning this $dependency.
 					} else {
 						# The dependency has the right value for these dependents; one of them may be set.
 						if( scalar( @valued_dependents ) > 1 ) {
-							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_TOO_MANY_SET', 
-								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
-								'DEP_ON_VAL' => $dep_on_attr_val, 
+							$node->_throw_error_message( 'SSM_N_ASDC_LATDP_TOO_MANY_SET', 
+								{ 'DEP_ON' => $dep_on_enum_nm, 'DEP_ON_VAL' => $dep_on_attr_val, 
 								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
 						}
 						if( scalar( @valued_dependents ) == 0 ) {
 							if( $is_mandatory ) {
 								my @possible_candidates = (@{$lits}, @{$enums}, @{$nrefs});
-								$node->_throw_error_message( 'SSM_N_TEDC_LATDP_ZERO_SET', 
-									{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
-								'DEP_ON_VAL' => $dep_on_attr_val, 'ATNMS' => "@possible_candidates" } );
+								$node->_throw_error_message( 'SSM_N_ASDC_LATDP_ZERO_SET', 
+									{ 'DEP_ON' => $dep_on_enum_nm, 'DEP_ON_VAL' => $dep_on_attr_val, 
+									'ATNMS' => "@possible_candidates" } );
 							}
 						}
 						# If we get here, the tests have passed concerning this $dependency.
@@ -2533,9 +2735,9 @@ sub test_deferrable_constraints {
 					if( !defined( $dep_on_attr_val ) ) {
 						# The dependency is undef/null, so all dependents must be undef/null.
 						if( scalar( @valued_dependents ) > 0 ) {
-							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
-								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_nref_nm,
-								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+							$node->_throw_error_message( 'SSM_N_ASDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'DEP_ON' => $dep_on_nref_nm, 'NUMVALS' => scalar( @valued_dependents ), 
+								'ATNMS' => "@valued_dependents" } );
 						}
 					} else {
 						# The dependency is valued, so a dependent may be set.
@@ -2551,17 +2753,120 @@ sub test_deferrable_constraints {
 	}
 
 	# This is the end of the tests that can be performed on "Alone" Nodes.
+}
 
-	my $container = $node->{$NPROP_CONTAINER};
-	unless( $container ) {
-		return( 1 ); # "Alone" Nodes quit now.
+sub _assert_child_comp_deferrable_constraints {
+	# Assertions in this method can only be performed on Nodes in "Well Known" status.
+	my ($node_or_class, $pseudonode_name, $child_nodes) = @_;
+	my $type_info = ref($node_or_class) ? 
+		$NODE_TYPES{$node_or_class->{$NPROP_NODE_TYPE}} : 
+		$PSEUDONODE_TYPES{$pseudonode_name};
+
+	# Do not evaluate any child Nodes that we aren't the primary parent Node of.
+	if( ref($node_or_class) ) {
+		# If $node_or_class is a Node, then _assert_in_node_deferrable_constraints() 
+		# would have already been called on it, so each child Node is guaranteed to have a 
+		# specific primary parent Node attribute, and that attribute is set.
+		my @child_nodes = ();
+		my %children_were_output = ();
+		foreach my $child_node (@{$child_nodes}) {
+			if( my $child_p_node_atnm = $child_node->{$NPROP_P_NODE_ATNM} ) {
+				if( my $child_main_parent = $child_node->{$NPROP_AT_NREFS}->{$child_p_node_atnm} ) {
+					if( $child_main_parent eq $node_or_class ) {
+						# Only nav to child if we are its primary parent, not simply any parent.
+						unless( $children_were_output{$child_node} ) {
+							# Only nav to child once; a child may link to primary parent multiple times.
+							push( @child_nodes, $child_node );
+							$children_were_output{$child_node} = 1;
+						}
+					}
+				}
+			}
+		}
+		$child_nodes = \@child_nodes; # We are primary-parent of all remaining child Nodes.
 	}
 
-	# If we get here, Node is "At Home" or "Well Known".
-	# However, only "Well Known" Nodes would get invoked by Container.test_deferrable_constraints(); 
-	# "At Home" Nodes only get this far when Node.test_deferrable_constraints() invoked externally.
+	# 1: Now assert constraints associated with Node-type details given in each 
+	# "Child Quantity List" section of Language.pod.
 
-	# TODO: Tests that examine a Node's correctness based on attributes of related Nodes.
+	if( my $child_quants = $type_info->{$TPI_CHILD_QUANTS} ) {
+		foreach my $child_quant (@{$child_quants}) {
+			my ($child_node_type, $range_min, $range_max) = @{$child_quant};
+			my $child_count = 0;
+			foreach my $child_node (@{$child_nodes}) {
+				$child_node->{$NPROP_NODE_TYPE} eq $child_node_type or next;
+				$child_count ++;
+			}
+			# SHORT CUT: We know that with all of our existing config data, 
+			# there are no pseudo-Nodes with TPI_CHILD_QUANTS, only Nodes.
+			if( $child_count < $range_min ) { 
+				$node_or_class->_throw_error_message( 'SSM_N_ASDC_CH_N_TOO_FEW_SET', 
+					{ 'COUNT' => $child_count, 'CNTYPE' => $child_node_type, 'EXPNUM' => $range_min } );
+			}
+			if( defined( $range_max ) and $child_count > $range_max ) {
+				$node_or_class->_throw_error_message( 'SSM_N_ASDC_CH_N_TOO_MANY_SET', 
+					{ 'COUNT' => $child_count, 'CNTYPE' => $child_node_type, 'EXPNUM' => $range_max } );
+			}
+		}
+	}
+
+	# 2: Now assert constraints associated with Node-type details given in each 
+	# "Distinct Child Groups List" section of Language.pod.
+
+	if( my $mudi_atgps = $type_info->{$TPI_MUDI_ATGPS} ) {
+		foreach my $mudi_atgp (@{$mudi_atgps}) {
+			my ($mudi_name, $mudi_atgp_subsets) = @{$mudi_atgp};
+			my %examined_children = ();
+			foreach my $mudi_atgp_subset (@{$mudi_atgp_subsets}) {
+				my ($child_node_type, $lits, $enums, $nrefs) = @{$mudi_atgp_subset};
+				CHILD: foreach my $child_node (@{$child_nodes}) {
+					$child_node->{$NPROP_NODE_TYPE} eq $child_node_type or next CHILD;
+					my $hash_key = ',';
+					foreach my $attr_name (@{$lits}) {
+						my $val = $child_node->{$NPROP_AT_LITERALS}->{$attr_name};
+						defined( $val ) or next CHILD; # null values are always distinct
+						$val =~ s|,|<comma>|g; # avoid problems from literals containing delim chars
+						$hash_key .= $val.',';
+					}
+					foreach my $attr_name (@{$enums}) {
+						my $val = $child_node->{$NPROP_AT_ENUMS}->{$attr_name};
+						defined( $val ) or next CHILD; # null values are always distinct
+						$hash_key .= $val.',';
+					}
+					foreach my $attr_name (@{$nrefs}) {
+						my $val = $child_node->{$NPROP_AT_NREFS}->{$attr_name};
+						defined( $val ) or next CHILD; # null values are always distinct
+						$hash_key .= $val.','; # stringifies to likes of 'HASH(NNN)'
+					}
+					if( exists( $examined_children{$hash_key} ) ) {
+						# Multiple Nodes in same group have the same hash key, which 
+						# means they are identical by means of the compared attributes.
+						my $child_node_id = $child_node->{$NPROP_NODE_ID};
+						my $matched_child_node = $examined_children{$hash_key};
+						my $matched_child_node_type = $matched_child_node->{$NPROP_NODE_TYPE};
+						my $matched_child_node_id = $matched_child_node->{$NPROP_NODE_ID};
+						if( ref($node_or_class) ) {
+							$node_or_class->_throw_error_message( 'SSM_N_ASDC_MUDI_NON_DISTINCT', 
+								{ 'VALUES' => $hash_key, 'MUDI' => $mudi_name, 
+								'C1NTYPE' => $child_node_type, 'C1NID' => $child_node_id, 
+								'C2NTYPE' => $matched_child_node_type, 'C2NID' => $matched_child_node_id } );
+						} else {
+							$node_or_class->_throw_error_message( 'SSM_N_ASDC_MUDI_NON_DISTINCT_PSN', 
+								{ 'PSNTYPE' => $pseudonode_name, 
+								'VALUES' => $hash_key, 'MUDI' => $mudi_name, 
+								'C1NTYPE' => $child_node_type, 'C1NID' => $child_node_id, 
+								'C2NTYPE' => $matched_child_node_type, 'C2NID' => $matched_child_node_id } );
+						}
+					}
+					$examined_children{$hash_key} = $child_node;
+				}
+			}
+		}
+	}
+
+	# TODO: more tests that examine multiple nodes together ...
+
+	# This is the end of the tests that can be performed only on "Well Known" Nodes.
 }
 
 ######################################################################
@@ -2592,7 +2897,7 @@ sub _get_all_properties {
 				if( $child_main_parent eq $node ) {
 					# Only output child if we are its primary parent, not simply any parent.
 					unless( $children_were_output{$child} ) {
-						# Only output child once; a child may link to same parent multiple times.
+						# Only output child once; a child may link to primary parent multiple times.
 						push( @children_out, $child->_get_all_properties() );
 						$children_were_output{$child} = 1;
 					}
@@ -2671,7 +2976,7 @@ included.)  However, here are a few example usage lines:
 		# ... add a lot more Nodes
 
 		# Now check that we didn't omit something important:
-		$model->test_deferrable_constraints();
+		$model->assert_deferrable_constraints();
 
 		# Now serialize all our Nodes to see if we stored what we expected:
 		print $model->get_all_properties_as_xml_str();
@@ -2736,8 +3041,8 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			</application>
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
-				<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-					<view id="1" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
+				<routine id="1" routine_type="FUNCTION" application="2" name="fetch_all_persons" return_var_type="CURSOR">
+					<view id="1" view_type="MATCH" routine="1" name="fetch_all_persons" match_all_cols="1">
 						<view_src id="1" view="1" name="person" match_table="1" />
 					</view>
 					<routine_var id="1" routine="1" name="person_cursor" var_type="CURSOR" curs_view="1" />
@@ -2748,12 +3053,12 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 						<routine_expr id="2" expr_type="VAR" p_stmt="2" routine_var="1" />
 					</routine_stmt>
 				</routine>
-				<routine id="2" routine_type="ANONYMOUS" application="2" name="insert_a_person">
+				<routine id="2" routine_type="PROCEDURE" application="2" name="insert_a_person">
 					<routine_arg id="1" routine="2" name="arg_person_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="2" routine="2" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="3" routine="2" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="4" routine="2" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="2" view_type="MATCH" name="insert_a_person" routine="2">
+					<view id="2" view_type="MATCH" routine="2" name="insert_a_person">
 						<view_src id="2" view="2" name="person" match_table="1">
 							<view_src_col id="1" src="2" match_table_col="1" />
 							<view_src_col id="2" src="2" match_table_col="2" />
@@ -2767,12 +3072,12 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					</view>
 					<routine_stmt id="3" routine="2" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="2" />
 				</routine>
-				<routine id="3" routine_type="ANONYMOUS" application="2" name="update_a_person">
+				<routine id="3" routine_type="PROCEDURE" application="2" name="update_a_person">
 					<routine_arg id="5" routine="3" name="arg_person_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="6" routine="3" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="7" routine="3" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="8" routine="3" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="3" view_type="MATCH" name="update_a_person" routine="3">
+					<view id="3" view_type="MATCH" routine="3" name="update_a_person">
 						<view_src id="3" view="3" name="person" match_table="1">
 							<view_src_col id="5" src="3" match_table_col="1" />
 							<view_src_col id="6" src="3" match_table_col="2" />
@@ -2789,9 +3094,9 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					</view>
 					<routine_stmt id="4" routine="3" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="3" />
 				</routine>
-				<routine id="4" routine_type="ANONYMOUS" application="2" name="delete_a_person">
+				<routine id="4" routine_type="PROCEDURE" application="2" name="delete_a_person">
 					<routine_arg id="9" routine="4" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<view id="4" view_type="MATCH" name="delete_a_person" routine="4">
+					<view id="4" view_type="MATCH" routine="4" name="delete_a_person">
 						<view_src id="4" view="4" name="person" match_table="1">
 							<view_src_col id="9" src="4" match_table_col="1" />
 						</view_src>
@@ -2905,12 +3210,12 @@ named host parameter if un-named client-side SQL is generated) and performs an
 UPDATE query against one table record; the query takes 4 arguments, using one
 to match a record and 3 as new record column values to set.
 
-	<routine id="3" routine_type="ANONYMOUS" application="2" name="update_a_person">
+	<routine id="3" routine_type="PROCEDURE" application="2" name="update_a_person">
 		<routine_arg id="5" routine="3" name="arg_person_id" var_type="SCALAR" domain="1" />
 		<routine_arg id="6" routine="3" name="arg_person_name" var_type="SCALAR" domain="2" />
 		<routine_arg id="7" routine="3" name="arg_father_id" var_type="SCALAR" domain="1" />
 		<routine_arg id="8" routine="3" name="arg_mother_id" var_type="SCALAR" domain="1" />
-		<view id="3" view_type="MATCH" name="update_a_person" routine="3">
+		<view id="3" view_type="MATCH" routine="3" name="update_a_person">
 			<view_src id="3" view="3" name="person" match_table="1">
 				<view_src_col id="5" src="3" match_table_col="1" />
 				<view_src_col id="6" src="3" match_table_col="2" />
@@ -2943,10 +3248,11 @@ those that require positional host parameters, illustrated with the DBI style of
 	SET name = ?, father_id = ?, mother_id = ?
 	WHERE person_id = ?;
 
-Alternately, a stored procedure (and calls to it) can be generated from the
-same SSM Node set, if the routine_type attribute is PROCEDURE instead of
-ANONYMOUS.  The two SQL variants are for new or old databases respectively,
-like the first example.
+Alternately, if the primary-parent Node for above routine was a 'schema' rather
+than an 'application', then a server-side stored procedure (and calls to it)
+can be generated from the same SSM Node set, instead of a client-side anonymous
+routine.  The two SQL variants are for new or old databases respectively, like
+the first example.
 
 	CREATE PROCEDURE update_a_person
 	(arg_person_id entity_id, arg_person_name person_name, arg_father_id entity_id, arg_mother_id entity_id)
@@ -2965,7 +3271,8 @@ like the first example.
 	END;
 
 To go with those, here are SQL statements to invoke the server-side stored
-procedures, with the two variants being named-vs-positional host parameters.
+procedures from the client side, with the two variants being
+named-vs-positional host parameters.
 
 	CALL update_a_person (:arg_person_id, :arg_person_name, :arg_father_id, :arg_mother_id);
 
@@ -3464,14 +3771,14 @@ tested" property of this Container.  This property is true when all "Well
 Known" Nodes in this Container are known to be free of all data errors, both
 individually and collectively.  This property is initially set to true when a
 Container is new and empty; it is also set to true by
-Container.test_deferrable_constraints() when all of its tests complete without
+Container.assert_deferrable_constraints() when all of its tests complete without
 finding any problems.  This property is set to false when any changes are made
 to a "Well Known" Node in this Container, which includes moving the Node in to
 or out of "Well Known" status.
 
-=head2 test_deferrable_constraints()
+=head2 assert_deferrable_constraints()
 
-	$model->test_deferrable_constraints();
+	$model->assert_deferrable_constraints();
 
 This "getter" method implements several types of deferrable data validation, to
 make sure that every "Well Known" Node in this Container is ready to be used,
@@ -3828,7 +4135,7 @@ new or first primary parent Node of NEW_CHILD.
 This "setter" method takes an array ref in its single LIST argument, and calls
 add_child_node() for each element found in it.
 
-=head2 test_deferrable_constraints()
+=head2 assert_deferrable_constraints()
 
 This "getter" method implements several types of deferrable data validation, to
 make sure that this Node is ready to be used; it throws an exception if it can

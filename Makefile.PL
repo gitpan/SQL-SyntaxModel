@@ -5,6 +5,6 @@ WriteMakefile(
 	NAME	=> 'SQL::SyntaxModel',
 	VERSION_FROM => 'lib/SQL/SyntaxModel.pm', # finds $VERSION
 	PREREQ_PM => {
-		'Locale::KeyedText' => 0.06,
+		'Locale::KeyedText' => 0.07,
 	},
 );

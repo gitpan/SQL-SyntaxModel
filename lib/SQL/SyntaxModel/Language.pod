@@ -328,7 +328,7 @@ another of the same type (eg: a sub-query or sub-routine).
 				</command>
 			</application>
 		</blueprints>
-		<tools>
+		<tools c="1">
 			<data_storage_product c="M" />
 			<data_link_product c="M" />
 		</tools>
@@ -360,7 +360,6 @@ another of the same type (eg: a sub-query or sub-routine).
 		<table_ind c="M">
 			<table_ind_col c="M" />
 		</table_ind>
-		<routine c="M" r="Y" />
 	</table>
 
 	<view c="M" r="Y">
@@ -375,7 +374,6 @@ another of the same type (eg: a sub-query or sub-routine).
 		</view_join>
 		<view_hierarchy c="1" />
 		<view_expr c="M" r="Y" />
-		<routine c="M" r="Y" />
 	</view>
 
 	<routine c="M" r="Y">
@@ -713,7 +711,6 @@ These are the standard parts of a view/query definition that are not in the
 "from" part.  
 
 	RESULT - the result list at the top; one item per "view_col" per view
-	INTO   - when outer view is read from in a routine (select or fetch), this is the "into" part
 	SET    - when outer view used by an "insert" or "update", this is the "set" part
 	FROM   - when view source in "from" part is a named subquery with args, these are arg values
 	WHERE  - the SQL "where" part
@@ -726,6 +723,10 @@ These are the standard parts of a view/query definition that are not in the
 
 	Note that SQL::SyntaxModel may need more metadata to represent parts of a GROUP BY 
 	clause, such as OLAP extensions ... or it may not.
+
+	Note that details for the INTO portion of a "select|fetch into" query is
+	stored in view_col Nodes, and so isn't represented by the view_part
+	enumerated list.
 
 	According to SQL-2003 Foundation 7.11 (p331), the WINDOW clause in a query seems 
 	to contain/replace the likes of ORDER BY, LIMIT/MAXR, OFFSET/SKIPR, but it is 
@@ -747,8 +748,8 @@ variables or columns).
 	COL   - use the value of a local view source column
 	MCOL  - match a result column; used mainly with MATCH view, or in 'having','order' sql elsewhere
 	VARG  - when view is a "with" sub-query, use value of an argument to the view
-	ARG   - use value of an arg to the current routine, or fetch 'into' it if INTO view part
-	VAR   - use value of a variable declared in the current routine, or fetch 'into' it if INTO view part
+	ARG   - use value of an arg to the current routine
+	VAR   - use value of a variable declared in the current routine
 	SEQN  - use "next" value from a named user defined sequence generator (schema object)
 	CVIEW - use result of a call to a view, such as a subquery or a cursor
 	SFUNC - use result of a call to a standard built-in function (or directive); one of standard_func
@@ -851,11 +852,18 @@ but your choice of type can severely limit what kinds of arguments you can
 take.  Only some routine types, functions mainly, can return a value.  Only some
 routine types have names.
 
-	ANONYMOUS - an anonymous/un-named routine declared in an application context, not persistant
+I<Up to and including the 2004-08-31 SQL::SyntaxModel v0.40 release, there was
+an additional routine_type called ANONYMOUS, which was intended to be used for
+all routines that were children of 'application' Nodes, while PROCEDURE and
+FUNCTION would only be used as children of 'schema' Nodes (or be nested).  As
+of SQL::SyntaxModel v0.41, the distinct ANONYMOUS routine type has gone away,
+while PROCEDURE and FUNCTION will now assume any differing behaviour necessary
+when they are children of 'application'.>
+
 	PACKAGE   - an Oracle package; a namespace beneath a schema for related funcs and procs
 	TRIGGER   - a trigger on a table or schema view
-	PROCEDURE - a named stored procedure, under a schema or a package or nested under a rtn that is
-	FUNCTION  - a named stored function, under a schema or a package or nested under a rtn that is
+	PROCEDURE - a named stored procedure, under a schema|package|app|other-rtn
+	FUNCTION  - a named stored function, under a schema|package|app|other-rtn
 	BLOCK     - declares a compound statement that can contain other statements; eg BEGIN ... END
 
 	This list is probably missing some items.
@@ -1109,9 +1117,13 @@ major+minor type it is, and what kind of value constraints it must obey,
 including both independent and dependent constraints.  Some attribute value
 constraints are constantly applied, while many of them are deferrable.
 
+Each pseudo-Node also has a section that looks like one for a normal Node type;
+these sections are where certain details about Nodes that have pseudo-Node
+parents go, because those details are explained in terms of "child Nodes".
+
 For each Node Type, there are several detail lists: B<Attribute List>,
 B<Exclusive Attribute Groups List>, B<Local Attribute Dependencies List>,
-B<Example List>.  I<TODO: Replace the "Unique Constraint List" sections.>
+B<Child Quantity List>, B<Distinct Child Groups List>, B<Example List>.
 
 The B<Attribute List> says what all of the attributes are, in order, along with
 each one's major+minor type, an indicator of whether it is a primary parent
@@ -1124,7 +1136,7 @@ In the above usage, the major-type is shortened from its full name like this:
 is "node_id" (the attr-name is always "id"), then "NODE_ID" appears in place of
 the combined major and minor types on the line.  Every Node type's
 "id"/"NODE_ID" attribute is implicitly always-mandatory; moreover, that
-attribute is implicitly always-unique within Nodes of the same Node type.
+attribute is implicitly always-distinct within Nodes of the same Node type.
 
 I<Note that any Node attributes whose attr-name is "name" (an L.cstr) have a
 special meaning that corresponds to the ANSI/ISO SQL-2003 standard's impression
@@ -1162,13 +1174,13 @@ Nodes that are simultaneously in the same container.  As another, you can never
 set a primary parent for a Node which is a direct or indirect descendent of
 that Node, so circular references are guaranteed to never exist.
 
-The "Attribute List" also contains a few details that pertain to deferred
-constraints.  One deferred constraint is that a Node's NODE_ID attribute must
-be set; that is, this constraint is only deferred for Nodes that are not in
-Containers.  Another deferred constraint is that exactly one primary-parent
-attribute must be set, if the Node has any "PP" attributes.  Another deferred
+The "Attribute List" also contains a few details that pertain to deferrable
+constraints.  One deferrable constraint is that a Node's NODE_ID attribute must
+be set; that is, this constraint is only deferrable for Nodes that are not in
+Containers.  Another deferrable constraint is that exactly one primary-parent
+attribute must be set, if the Node has any "PP" attributes.  Another deferrable
 constraint is that any "MA" attributes are populated.  All "Attribute List" 
-deferred constraints can be tested on Nodes of any status, including "Alone".
+deferrable constraints can be tested on Nodes of any status, including "Alone".
 
 The B<Exclusive Attribute Groups List> says what groups of mutually exclusive
 attributes there are for a Node type besides the "PP" group; no more than one 
@@ -1181,7 +1193,7 @@ For each mutex-name group, there are 2 or more attr-name which are members of
 the group; if mandatory-flag is present, which looks like "MA", then one member
 of the group must always be set; if mandatory-flag is not present, then it is
 fine for all group members to not be set.  All "Exclusive Attribute Groups
-List" constraints are deferred and can be tested on Nodes of any status,
+List" constraints are deferrable and can be tested on Nodes of any status,
 including "Alone".
 
 The B<Local Attribute Dependencies List> says what Node type attributes have
@@ -1204,7 +1216,41 @@ though in most cases only one value will do.  If there are multiple dependent
 attributes shown on the same line (comma-delimited), then they are a
 mutual-exclusion group; only one of those may be set when the conditions say
 that any may be set.  All "Local Attribute Dependencies List" constraints are
-deferred and can be tested on Nodes of any status, including "Alone".
+deferrable and can be tested on Nodes of any status, including "Alone".
+
+The B<Child Quantity List> says when a Node must have a specific number of
+primary-child Nodes of a particular Node type (usually >= 1).  Each list
+element is in this format:
+
+	<child-node-type> - <range-min>[ - <range-max>]
+
+For each child-node-type, there can be a limit on how few or how many
+primary-child Nodes of that Node type are allowed.  A common range-min is 1,
+but if it is 0 then range-max will be valued.  All "Child Quantity List"
+constraints are deferrable and can only be tested on "Well Known" Nodes.
+
+The B<Distinct Child Groups List> says what groups of mutually distinct
+primary-child Nodes there are for Nodes of a Node type; each member Node of a
+group must have distinct/unique values for particular attributes (usually
+"name") or attribute combinations.  Each list element is in this format:
+
+	<mudi-name>:
+		<child-node-type> - <child-attr-name>(,<child-attr-name>){0,}
+
+For each mudi-name group there can be one or more Node attributes where the
+attribute value combination must be distinct, besides the constantly applied
+distinct NODE_ID/id constraint; a single child-attr-name on a line means only
+that one attribute is distinct within itself, where multiple child-attr-name
+indicate a combination to check.  If there are multiple lines under a
+mudi-name, then each one will have a different child-node-type; the attributes
+that line up vertically between different Node types are meant to correspond,
+and would be of the same major+minor attribute type; each corresponding line
+would also have the same number of child-attr-name.  For all comparisons, an
+undefined attribute value always counts as a distinct value; multiple undefined
+corresponding values will not violate the constraint (other constraints
+eliminate undefined values when they are a problem).  The implicit distinct-id
+constraints all have a mudi-name of 'primary'.  All "Distinct Child Groups
+List" constraints are deferrable and can only be tested on "Well Known" Nodes.
 
 The B<Example List> is a list of example Nodes for the Node type, formatted
 like a table, one row per Node, one column per attribute.
@@ -1216,6 +1262,25 @@ If these same Nodes were stored in an RDBMS, then extra columns may need to be
 added to remember their sequence, which an RDBMS does not natively do. 
 Whereas, if the Nodes were stored in XML format, you won't need to add
 anything, as XML preserves order.>
+
+=head2 root
+
+This pseudo-Node is the root of a SQL::SyntaxModel and has as its children the
+other 5 pseudo-Nodes: elements, blueprints, tools, sites, circumventions.
+
+=head2 elements
+
+This pseudo-Node has no child Node-types but might be given some later.
+
+=head2 blueprints
+
+This pseudo-Node has two child Node-types: catalog, application.
+
+Distinct Child Groups List:
+
+	ak_name:
+		catalog - name
+		application - name
 
 =head2 catalog
 
@@ -1237,9 +1302,12 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	name - L.cstr - lets you label the blueprint if you want; this isn't used when making SQL
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_name:
+		catalog_link - name
+		schema - name
+		role - name
 
 Example List:
 
@@ -1270,9 +1338,13 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	name - L.cstr - lets you label the blueprint if you want
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_name:
+		catalog_link - name
+		view - name
+		routine - name
+		command - name
 
 =head2 owner
 
@@ -1286,10 +1358,6 @@ Attribute List:
 
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	catalog - N.catalog - PP - the catalog that this user is in
-
-Unique Constraint List:
-
-	primary - [id]
 
 Example List:
 
@@ -1329,10 +1397,6 @@ Attribute List:
 	name - L.cstr - MA - the "catalog link" that is the front of the fully qualified remote schema object name
 	target - N.catalog - MA - this is what the link connects to
 
-Unique Constraint List:
-
-	primary - [id]
-
 =head2 schema
 
 This type of Node describes a "schema" or "name space" into which your schema
@@ -1362,10 +1426,14 @@ Attribute List:
 	name - L.cstr - MA - the name this schema/namespace is identified by
 	owner - N.owner - MA - the user that owns this schema
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
-	ak_name - [catalog,name]
+	ak_name:
+		domain - name
+		sequence - name
+		table - name
+		view - name
+		routine - name
 
 Example List:
 
@@ -1385,11 +1453,6 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	catalog - N.catalog - PP - the catalog that this role is in
 	name - L.cstr - MA - the name this role is identified by
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [catalog,name]
 
 =head2 privilege_on
 
@@ -1413,9 +1476,10 @@ Exclusive Attribute Groups List:
 
 	privilege_on - schema,domain,sequence,table,routine - MA
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_option:
+		privilege_for - priv_type
 
 =head2 privilege_for
 
@@ -1427,11 +1491,6 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	priv_on - N.privilege_on - PP - what "privilege_on" Node this option is associated with
 	priv_type - E.privilege_type - MA - what manner of privilege this is
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_option - [priv_on,priv_type]
 
 =head2 domain
 
@@ -1509,10 +1568,10 @@ Local Attribute Dependencies List:
 	num_precision:
 		num_scale
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
-	ak_name - [schema,name]
+	ak_option:
+		domain_opt - value
 
 Example List:
 
@@ -1559,11 +1618,6 @@ Attribute List:
 	domain - N.domain - PP - what "domain" Node this option is associated with
 	value - L.misc - MA - this is the actual enumerated value that the domain_opt Node represents
 
-Unique Constraint List:
-
-	primary - [id]
-	ak_option - [domain,value]
-
 Example List:
 
 	|id|do|v|
@@ -1591,11 +1645,6 @@ Attribute List:
 	cycle - L.bool - if true, sequence continues after reaching bound, at other end; defaults to false
 	order - L.bool - if true, seq guaranteed to ret numbers in order; def false, will just be unique
 
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [schema,name]
-
 =head2 table
 
 This type of Node describes the core (single cardinality) description of a
@@ -1610,10 +1659,15 @@ Attribute List:
 	schema - N.schema - PP - the schema that this table is in
 	name - L.cstr - MA - the name this table is identified by
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
-	ak_name - [schema,name]
+	table_col - 1
+
+Distinct Child Groups List:
+
+	ak_name:
+		table_col - name
+		table_ind - name
 
 Example List:
 
@@ -1643,11 +1697,6 @@ Attribute List:
 Exclusive Attribute Groups List:
 
 	default - default_val,default_seq
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [table,name]
 
 Example List:
 
@@ -1701,10 +1750,16 @@ Local Attribute Dependencies List:
 	ind_type:
 		f_table - FOREIGN,UFOREIGN - MA
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
-	ak_name - [table,name]
+	table_ind_col - 1
+
+Distinct Child Groups List:
+
+	ak_table_col:
+		table_ind_col - table_col
+	ak_f_table_col:
+		table_ind_col - f_table_col
 
 Example List:
 
@@ -1734,11 +1789,6 @@ Attribute List:
 	table_ind - N.table_ind - PP - unique identifier for index within table
 	table_col - N.table_col - MA - unique identifier for column within table
 	f_table_col - N.table_col - when the index type is a foreign key, this is the constraining column
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_table_col - [table_ind,table_col]
 
 Example List:
 
@@ -1823,10 +1873,10 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	view_type - E.view_type - MA - what kind of view this is; eg: match, single, mult, compound, has-subq, recursive
 	schema - N.schema - PP - the schema that this view is in, if any
-	name - L.cstr - MA - the name this view is identified by, if any
 	application - N.application - PP - if view in app space, not app routine, an app is our parent
 	routine - N.routine - PP - parent view of this one, if any; empty if this is the root view
 	p_view - N.view - PP - parent view of this one, if any; empty if this is the root view
+	name - L.cstr - MA - the name this view is identified by, if any
 	match_all_cols - L.bool - if true, this view matches every col (like '*'); if false, view_col has list
 	compound_op - E.compound_operator - how to merge any child rowsets/views of this one together, if any
 	distinct_rows - L.bool - (set quantifier) true, select|compound returns distinct rows; false, return all rows
@@ -1841,10 +1891,27 @@ Local Attribute Dependencies List:
 		match_all_cols - MATCH
 		compound_op - COMPOUND - MA
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
-	ak_name - [schema,name]
+	view_hierarchy - 0 - 1
+
+Distinct Child Groups List:
+
+	ak_name:
+		view_arg - name
+		view_col - name
+	ak_src_name:
+		view_src - name
+	ak_join:
+		view_join - lhs_src,rhs_src
+	ak_join_limit_one:
+		view_join - rhs_src
+	ak_expr_result_col:
+		view_expr - view_col
+	ak_expr_set_col:
+		view_expr - set_view_col
+	ak_expr_from_src_arg:
+		view_expr - view_src_arg
 
 Example List:
 
@@ -1864,7 +1931,7 @@ When this view is a named sub-query, declared in the "with" clause of the main
 query/view, then it can take arguments to define its caller context; each
 "view_arg" Node you attach to a "view" Node names an argument.  This Node type
 is not used for anything else; it is not like a routine arg that doubles for an
-app bind var.
+app host param.
 
 Attribute List:
 
@@ -1872,11 +1939,6 @@ Attribute List:
 	view - N.view - PP - what named sub-query view this is an argument for
 	name - L.cstr - MA - name of the argument
 	domain - N.domain - MA - the user-customized data type for this argument
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [view,name]
 
 =head2 view_src
 
@@ -1899,10 +1961,12 @@ Exclusive Attribute Groups List:
 
 	match - match_table,match_view - MA
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
-	ak_name - [view,name]
+	ak_table_col:
+		view_src_col - match_table_col
+	ak_view_col:
+		view_src_col - match_view_col
 
 Example List:
 
@@ -1932,10 +1996,6 @@ Attribute List:
 	src - N.view_src - PP - which view source this column is associated with
 	match_view_arg - N.view_arg - MA - which argument in the source view is represented
 
-Unique Constraint List:
-
-	primary - [id]
-
 =head2 view_src_col
 
 This type of Node describes a column in a source table or view that is used by
@@ -1951,10 +2011,6 @@ Attribute List:
 Exclusive Attribute Groups List:
 
 	match_col - match_table_col,match_view_col - MA
-
-Unique Constraint List:
-
-	primary - [id]
 
 Example List:
 
@@ -2004,16 +2060,17 @@ Attribute List:
 	view - N.view - PP - what view this column is a result/interface for
 	name - L.cstr - MA - unique identifier for column within view
 	domain - N.domain - MA - the user-customized data type for this column
+	set_routine_arg - N.routine_arg - the routine arg we are setting value of via select "into"
+	set_routine_var - N.routine_var - the routine var we are setting value of via select "into"
 	src_col - N.view_src_col - simply match this src col rather than defining with a view_expr
 
 	is_writeable - L.bool - true when enough info is known to write changes to this column
 	is_required - L.bool - true when corresponding value must always be populated
 	is_key - L.bool - true when this column is a part of unique id for source table or for view row
 
-Unique Constraint List:
+Exclusive Attribute Groups List:
 
-	primary - [id]
-	ak_name - [view,name]
+	select_into - set_routine_arg,set_routine_var
 
 Example List:
 
@@ -2061,11 +2118,16 @@ Attribute List:
 	rhs_src - N.view_src - MA - which view source is on the right side of the join
 	join_type - E.join_operator - MA - what kind of table/view join is being done
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
-	ak_join - [lhs_src,rhs_src]
-	ak_limit_one - [rhs_src]
+	view_join_col - 1
+
+Distinct Child Groups List:
+
+	ak_lhs_col:
+		view_join_col - lhs_src_col
+	ak_rhs_col:
+		view_join_col - rhs_src_col
 
 Example List:
 
@@ -2090,10 +2152,6 @@ Attribute List:
 	join - N.view_join - PP - which view join this column is associated with
 	lhs_src_col - N.view_src_col - MA - which column from the left source is being matched on
 	rhs_src_col - N.view_src_col - MA - which column from the right source is being matched on
-
-Unique Constraint List:
-
-	primary - [id]
 
 Example List:
 
@@ -2141,10 +2199,6 @@ Local Attribute Dependencies List:
 		start_routine_arg - ARG - MA
 		start_routine_var - VAR - MA
 
-Unique Constraint List:
-
-	primary - [id]
-
 =head2 view_expr
 
 This type of Node is intended to describe most of the parts of a SQL "select"
@@ -2188,8 +2242,6 @@ Attribute List:
 	view - N.view - PP - what view this expression has a part in defining
 	view_part - E.view_part - what "part" of a view definition this is defining
 	view_col - N.view_col - the view interface/result column we are defining the value of
-	set_routine_arg - N.routine_arg - the routine arg we are setting value of via select "into"
-	set_routine_var - N.routine_var - the routine var we are setting value of via select "into"
 	set_view_col - N.view_src_col - this is the column we are setting the value of in insert or update op
 	view_src_arg - N.view_src_arg - arg of named subquery used in "from" we are passing value to
 	domain - N.domain - cast curr LIT expr or single CAST child expression into this data type / domain
@@ -2216,8 +2268,7 @@ Exclusive Attribute Groups List:
 Local Attribute Dependencies List:
 
 	view_part:
-		view_col - RESULT,INTO - MA
-		set_routine_arg,set_routine_var - INTO - MA
+		view_col - RESULT - MA
 		set_view_col - SET - MA
 		view_src_arg - FROM - MA
 	expr_type:
@@ -2235,9 +2286,12 @@ Local Attribute Dependencies List:
 	call_ufunc:
 		catalog_link
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_view_arg:
+		view_expr - call_view_arg
+	ak_ufunc_arg:
+		view_expr - call_ufunc_arg
 
 Example List:
 
@@ -2245,14 +2299,14 @@ Example List:
 	|--|--|--|------|--|-----|-----|---|--------|---|---|-----|--|
 	| 1|  | 5|WHERE |  |SFUNC|     |   |        |   |   |EQ   |  | - standard function of "eq(a,b)"
 	| 2|  |  |      | 1|COL  |     |   |        | 30|   |     |  | - match column "user_auth"."user_id"
-	| 3|  |  |      | 1|ARG  |     |   |curr_uid|   |   |     |  | - value of bind var "curr_uid"
+	| 3|  |  |      | 1|ARG  |     |   |curr_uid|   |   |     |  | - value of host param "curr_uid"
 	| 4|  | 6|WHERE |  |SFUNC|     |   |        |   |   |AND  |  | - standard function of "and(a,b)"
 	| 5|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE |  | - standard function of "like(a,b)"
 	| 6|  |  |      | 5|COL  |     |   |        | 28|   |     |  | - match column "m"."father_name"
-	| 7|  |  |      | 5|ARG  |     |   |srchw_fa|   |   |     |  | - value of bind var "srchw_fa"
+	| 7|  |  |      | 5|ARG  |     |   |srchw_fa|   |   |     |  | - value of host param "srchw_fa"
 	| 8|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE |  | - standard function of "like(a,b)"
 	| 9|  |  |      | 8|COL  |     |   |        | 29|   |     |  | - match column "m"."mother_name"
-	|10|  |  |      | 8|ARG  |     |   |srchw_mo|   |   |     |  | - value of bind var "srchw_mo"
+	|10|  |  |      | 8|ARG  |     |   |srchw_mo|   |   |     |  | - value of host param "srchw_mo"
 	|11|  | 3|WHERE |  |SFUNC|     |   |        |   |   |EQ   |  | - standard function of "eq(a,b)"
 	|12|  |  |      |11|COL  |     |   |        | 23|   |     |  | - match column "user_pref"."pref_name"
 	|13|  |  |      |11|LIT  |theme|   |        |   |   |     |  | - match literal value of "theme"
@@ -2346,29 +2400,33 @@ Attribute List:
 	schema - N.schema - PP - the schema that this routine is in, if any
 	application - N.application - PP - if routine is in the application space, an app is our parent
 	p_routine - N.routine - PP - parent routine of this one, if any; empty if this is the root routine
-	table - N.table - PP - if this routine is a trigger on a table, then this is the table to watch
-	view - N.view - PP - if this routine is a trigger on a named view, then this is the view to watch
 	name - L.cstr - MA - name routine ident by in a [schema, p_routine, app], or name of trigger
 	return_var_type - E.basic_var_type - variable type of function's return value
 	return_domain - N.domain - domain of a function's scalar return value
+	trigger_on_table - N.table - the table that the trigger watches
+	trigger_on_view - N.view - the view that the trigger watches
 	trigger_event - E.basic_trigger_event - when a trigger executes
 	trigger_per_stmt - L.bool - true, exec each stmt, false, each row
 
 Local Attribute Dependencies List:
 
 	routine_type:
-		return_var_type - ANONYMOUS,FUNCTION
+		return_var_type - FUNCTION - MA
+		trigger_on_table,trigger_on_view - TRIGGER - MA
 		trigger_event - TRIGGER - MA
 		trigger_per_stmt - TRIGGER - MA
 	return_var_type:
 		return_domain - SCALAR - MA
 
-	TODO: Make return_var_type mandatory for FUNCTION only.
+Child Quantity List:
 
-Unique Constraint List:
+	routine_stmt - 1
 
-	primary - [id]
-	ak_name - [schema,name]
+Distinct Child Groups List:
+
+	ak_name:
+		routine_arg - name
+		routine_var - name
 
 =head2 routine_arg
 
@@ -2388,11 +2446,6 @@ Local Attribute Dependencies List:
 	var_type:
 		domain - SCALAR - MA
 		curs_view - CURSOR - MA
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [routine,name]
 
 =head2 routine_var
 
@@ -2421,11 +2474,6 @@ Local Attribute Dependencies List:
 		curs_view - CURSOR - MA
 		curs_for_update - CURSOR
 
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [routine,name]
-
 =head2 routine_stmt
 
 This type of Node describes a statement or logic control or line within a
@@ -2445,7 +2493,7 @@ Attribute List:
 	curs_arg - N.routine_arg - if SPROC stmt that works with CURSOR, this arg may have the cursor
 	curs_var - N.routine_var - if SPROC stmt that works with CURSOR, this var may have the cursor
 	view_for_dml - N.view - if SPROC stmt that is an ins/upd/del/etc (non-cursor) def by a view, name it here
-	call_uproc - N.routine - this is the user-defined stored function (routine) to call
+	call_uproc - N.routine - this is the user-defined stored procedure (routine) to call
 	catalog_link - N.catalog_link - if uproc in another catalog, say via which catalog link
 
 	Note: For RETURN stmt, the value to be returned is defined by this stmts child expr.
@@ -2462,9 +2510,10 @@ Local Attribute Dependencies List:
 	call_uproc:
 		catalog_link
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_uproc_arg:
+		routine_expr - call_uproc_arg
 
 =head2 routine_expr
 
@@ -2488,7 +2537,8 @@ Attribute List:
 	sequence - N.sequence - the sequence generator we will get the "next" value for
 	call_sfunc - E.standard_func - the standard built-in function we will invoke
 	call_ufunc - N.routine - the user-defined stored function we are calling
-	call_ufunc_arg - N.routine_arg - if parent set call_ufunc/uproc, name routine arg that curr expr passes value to
+	call_ufunc_arg - N.routine_arg - if parent expr set call_ufunc, name routine arg that curr expr passes value to
+	call_uproc_arg - N.routine_arg - if parent stmt set call_uproc, name routine arg that curr expr passes value to
 	catalog_link - N.catalog_link - if ufunc in another catalog, say via which catalog link
 
 Exclusive Attribute Groups List:
@@ -2508,9 +2558,10 @@ Local Attribute Dependencies List:
 	call_ufunc:
 		catalog_link
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_ufunc_arg:
+		routine_expr - call_ufunc_arg
 
 =head2 command
 
@@ -2525,9 +2576,11 @@ Attribute List:
 	name - L.cstr - the name this command (pseudo-routine) is identified by in an application, if any
 	command_type - E.command_type - MA - what SQL::SyntaxModel recognized command to run
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
+	command_arg - 0 - 2
+
+	TODO: make this variable based on command_type.
 
 =head2 command_arg
 
@@ -2551,9 +2604,16 @@ Exclusive Attribute Groups List:
 
 	command_arg - catalog_link,schema,domain,sequence,table,view,routine,user - MA
 
-Unique Constraint List:
+=head2 tools
 
-	primary - [id]
+This pseudo-Node has two child Node-types: data_storage_product,
+data_link_product.
+
+Distinct Child Groups List:
+
+	ak_name:
+		data_storage_product - name
+		data_link_product - name
 
 =head2 data_storage_product
 
@@ -2576,17 +2636,14 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	name - L.cstr - lets you label the product in the model if you want
 	product_code - L.cstr - MA - a string recognized by the mediation layer as what product we have
-	is_file_based - L.bool - if true, db data in a named file that we ref when opening it
+	is_memory_based - L.bool - if true, db data is held entirely in RAM memory of our own process
+	is_file_based - L.bool - if true, db data held in named file(s) that we ref to open in our own process
 	is_local_proc - L.bool - if true, database is a local service we access via IPC or something
 	is_network_svc - L.bool - if true, database is on a network server, access by network protocol
 
 Exclusive Attribute Groups List:
 
-	type - is_file_based,is_local_proc,is_network_svc - MA
-
-Unique Constraint List:
-
-	primary - [id]
+	type - is_memory_based,is_file_based,is_local_proc,is_network_svc - MA
 
 =head2 data_link_product
 
@@ -2612,9 +2669,16 @@ Attribute List:
 	product_code - L.cstr - MA - a string recognized by the mediation layer as what product we have
 	is_proxy - L.bool - if true, link product is a transparent proxy which calls another link prod (we may spec)
 
-Unique Constraint List:
+=head2 sites
 
-	primary - [id]
+This pseudo-Node has two child Node-types: catalog_instance,
+application_instance.
+
+Distinct Child Groups List:
+
+	ak_name:
+		catalog_instance - name
+		application_instance - name
 
 =head2 catalog_instance
 
@@ -2640,14 +2704,20 @@ Attribute List:
 	product - N.data_storage_product - MA - what product implements this; determines SQL dialect to use
 	blueprint - N.catalog - MA - what catalog blueprint describes this instance
 	name - L.cstr - lets you label the instance if you want; this isn't used when making SQL
+	file_path - L.cstr - Path on a file system for a file-based database, if applicable
 	server_ip - L.cstr - Internet IP address of the database server, if applicable
 	server_domain - L.cstr - Internet domain name of the database server, if applicable
 	server_port - L.uint - TCP/IP port the database listens to, if applicable
-	file_path - L.cstr - Path on a file system for a file-based database, if applicable
+	local_dsn - L.cstr - locally known driver-generic name for the catalog link (to cat or ch prox)
+	login_user - L.cstr - if we want to spec a username to always connect with, put here; else get it at runtime
+	login_pass - L.cstr - if we always use same password, put it here; else get it at runtime
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_option:
+		catalog_instance_opt - key
+	ak_user_name:
+		user - name
 
 Example List:
 
@@ -2685,11 +2755,6 @@ Attribute List:
 	key - L.cstr - MA - this is the option key that the the external code looks for
 	value - L.misc - MA - this is the associated option value
 
-Unique Constraint List:
-
-	primary - [id]
-	ak_option - [catalog,key,value]
-
 =head2 application_instance
 
 This type of Node describes a distinct instance of an "application".  
@@ -2702,10 +2767,6 @@ Attribute List:
 	id - NODE_ID - unique identifier for each Node within this Node Type
 	blueprint - N.application - MA - what application blueprint describes this instance
 	name - L.cstr - lets you label the instance if you want
-
-Unique Constraint List:
-
-	primary - [id]
 
 =head2 catalog_link_instance
 
@@ -2746,9 +2807,14 @@ Exclusive Attribute Groups List:
 	link_root_unrealized - p_link,unrealized - MA
 	link_root_target - p_link,target - MA
 
-Unique Constraint List:
+Child Quantity List:
 
-	primary - [id]
+	catalog_link_instance - 0 - 1
+
+Distinct Child Groups List:
+
+	ak_option:
+		catalog_link_instance_opt - key
 
 =head2 catalog_link_instance_opt
 
@@ -2766,11 +2832,6 @@ Attribute List:
 	link - N.catalog_link_instance - PP - the catalog_link_instance that this option customizes
 	key - L.cstr - MA - this is the option key that the the external code looks for
 	value - L.misc - MA - this is the associated option value
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_option - [link,key,value]
 
 =head2 user
 
@@ -2814,9 +2875,10 @@ Local Attribute Dependencies List:
 		name - ROOT,SCHEMA_OWNER,DATA_EDITOR - MA
 		password - ROOT,SCHEMA_OWNER,DATA_EDITOR - MA
 
-Unique Constraint List:
+Distinct Child Groups List:
 
-	primary - [id]
+	ak_role:
+		user_role - role
 
 Example List:
 
@@ -2839,9 +2901,9 @@ Attribute List:
 	user - N.user - PP - the user that a role is granted to
 	role - N.role - MA - the role that is being granted
 
-Unique Constraint List:
+=head2 circumventions
 
-	primary - [id]
+This pseudo-Node has one child Node-type: sql_fragment.
 
 =head2 sql_fragment
 
@@ -2863,10 +2925,6 @@ Exclusive Attribute Groups List:
 
 	is_where - is_inside,is_before,is_after
 
-Unique Constraint List:
-
-	primary - [id]
-
 =head1 OLDER DOCUMENTATION
 
 These paragraphs were more or less the original documentation for high-level
@@ -2884,9 +2942,9 @@ mandatory string property named 'type' (eg: 'database_open', 'table_create',
 are in a hash property named 'args'.  Elements of 'args' often include other
 Model class objects like 'Table' or 'DataType'.  Like all Model objects, this
 is static and context-independant; it is intended to be serialized and passed
-to code like DBI->prepare().   While bind vars are often used with them (such
+to code like DBI->prepare().   While host params are often used with them (such
 as values to insert or update, or record matching conditions), it is always up
-to the calling code to resolve the bind vars such as with a user prompt (as
+to the calling code to resolve the host params such as with a user prompt (as
 SQL*Plus does), and pass those to code like DBI->execute().  I<See also
 Rosetta::Command.>
 

@@ -156,7 +156,7 @@ sub create_and_populate_model {
 
 	# Describe a routine that returns a cursor to fetch all records in the 'person' table:
 	my $rt_fetchall = make_a_child_node( 'routine', $editor_app, 'application' );
-	$rt_fetchall->set_enumerated_attribute( 'routine_type', 'ANONYMOUS' );
+	$rt_fetchall->set_enumerated_attribute( 'routine_type', 'FUNCTION' );
 	$rt_fetchall->set_literal_attribute( 'name', 'fetch_all_persons' );
 	$rt_fetchall->set_enumerated_attribute( 'return_var_type', 'CURSOR' );
 	my $vw_fetchall = make_a_child_node( 'view', $rt_fetchall, 'routine' );
@@ -185,7 +185,7 @@ sub create_and_populate_model {
 
 	# Describe a routine that inserts a record into the 'person' table:
 	my $rt_insertone = make_a_child_node( 'routine', $editor_app, 'application' );
-	$rt_insertone->set_enumerated_attribute( 'routine_type', 'ANONYMOUS' );
+	$rt_insertone->set_enumerated_attribute( 'routine_type', 'PROCEDURE' );
 	$rt_insertone->set_literal_attribute( 'name', 'insert_a_person' );
 	my $rta_ins_pid = make_a_child_node( 'routine_arg', $rt_insertone, 'routine' );
 	$rta_ins_pid->set_literal_attribute( 'name', 'arg_person_id' );
@@ -245,7 +245,7 @@ sub create_and_populate_model {
 
 	# Describe a routine that updates a record in the 'person' table:
 	my $rt_updateone = make_a_child_node( 'routine', $editor_app, 'application' );
-	$rt_updateone->set_enumerated_attribute( 'routine_type', 'ANONYMOUS' );
+	$rt_updateone->set_enumerated_attribute( 'routine_type', 'PROCEDURE' );
 	$rt_updateone->set_literal_attribute( 'name', 'update_a_person' );
 	my $rta_upd_pid = make_a_child_node( 'routine_arg', $rt_updateone, 'routine' );
 	$rta_upd_pid->set_literal_attribute( 'name', 'arg_person_id' );
@@ -310,7 +310,7 @@ sub create_and_populate_model {
 
 	# Describe a routine that deletes a record from the 'person' table:
 	my $rt_deleteone = make_a_child_node( 'routine', $editor_app, 'application' );
-	$rt_deleteone->set_enumerated_attribute( 'routine_type', 'ANONYMOUS' );
+	$rt_deleteone->set_enumerated_attribute( 'routine_type', 'PROCEDURE' );
 	$rt_deleteone->set_literal_attribute( 'name', 'delete_a_person' );
 	my $rta_del_pid = make_a_child_node( 'routine_arg', $rt_deleteone, 'routine' );
 	$rta_del_pid->set_literal_attribute( 'name', 'arg_person_id' );
@@ -445,7 +445,7 @@ sub create_and_populate_model {
 	# ... we are still missing a bunch of things in this example ...
 
 	# Now check that we didn't omit something important:
-	$model->test_deferrable_constraints();
+	$model->assert_deferrable_constraints();
 
 	return( $model );
 }
@@ -490,8 +490,8 @@ sub expected_model_xml_output {
 		</application>
 		<application id="2" name="People Watcher">
 			<catalog_link id="2" application="2" name="editor_link" target="1" />
-			<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-				<view id="1" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
+			<routine id="1" routine_type="FUNCTION" application="2" name="fetch_all_persons" return_var_type="CURSOR">
+				<view id="1" view_type="MATCH" routine="1" name="fetch_all_persons" match_all_cols="1">
 					<view_src id="1" view="1" name="person" match_table="1" />
 				</view>
 				<routine_var id="1" routine="1" name="person_cursor" var_type="CURSOR" curs_view="1" />
@@ -502,12 +502,12 @@ sub expected_model_xml_output {
 					<routine_expr id="2" expr_type="VAR" p_stmt="2" routine_var="1" />
 				</routine_stmt>
 			</routine>
-			<routine id="2" routine_type="ANONYMOUS" application="2" name="insert_a_person">
+			<routine id="2" routine_type="PROCEDURE" application="2" name="insert_a_person">
 				<routine_arg id="1" routine="2" name="arg_person_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="2" routine="2" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="3" routine="2" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="4" routine="2" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="2" view_type="MATCH" name="insert_a_person" routine="2">
+				<view id="2" view_type="MATCH" routine="2" name="insert_a_person">
 					<view_src id="2" view="2" name="person" match_table="1">
 						<view_src_col id="1" src="2" match_table_col="1" />
 						<view_src_col id="2" src="2" match_table_col="2" />
@@ -521,12 +521,12 @@ sub expected_model_xml_output {
 				</view>
 				<routine_stmt id="3" routine="2" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="2" />
 			</routine>
-			<routine id="3" routine_type="ANONYMOUS" application="2" name="update_a_person">
+			<routine id="3" routine_type="PROCEDURE" application="2" name="update_a_person">
 				<routine_arg id="5" routine="3" name="arg_person_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="6" routine="3" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="7" routine="3" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="8" routine="3" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="3" view_type="MATCH" name="update_a_person" routine="3">
+				<view id="3" view_type="MATCH" routine="3" name="update_a_person">
 					<view_src id="3" view="3" name="person" match_table="1">
 						<view_src_col id="5" src="3" match_table_col="1" />
 						<view_src_col id="6" src="3" match_table_col="2" />
@@ -543,9 +543,9 @@ sub expected_model_xml_output {
 				</view>
 				<routine_stmt id="4" routine="3" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="3" />
 			</routine>
-			<routine id="4" routine_type="ANONYMOUS" application="2" name="delete_a_person">
+			<routine id="4" routine_type="PROCEDURE" application="2" name="delete_a_person">
 				<routine_arg id="9" routine="4" name="arg_person_id" var_type="SCALAR" domain="1" />
-				<view id="4" view_type="MATCH" name="delete_a_person" routine="4">
+				<view id="4" view_type="MATCH" routine="4" name="delete_a_person">
 					<view_src id="4" view="4" name="person" match_table="1">
 						<view_src_col id="9" src="4" match_table_col="1" />
 					</view_src>
@@ -641,7 +641,7 @@ sub test_circular_ref_prevention {
 		}
 	}
 
-	$model->test_deferrable_constraints();
+	$model->assert_deferrable_constraints();
 	$model->destroy();
 
 	return( $test1_passed, $test2_passed );
