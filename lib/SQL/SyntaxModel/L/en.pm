@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 ######################################################################
 
@@ -79,6 +79,11 @@ my %text_strings = (
 
 	'SSM_C_GET_CH_NODES_BAD_TYPE' => 
 		"get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+
+	'SSM_C_GET_NFNI_NO_ARG_TYPE' => 
+		"get_next_free_node_id(): missing NODE_TYPE argument",
+	'SSM_C_GET_NFNI_BAD_TYPE' => 
+		"get_next_free_node_id(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_N_NEW_NODE_NO_ARGS' => 
 		"new_node(): missing NODE_TYPE argument",

@@ -734,12 +734,12 @@ expression is one that either takes no arguments (includes constant values or na
 variables or columns).
 
 	LIT   - use a literal value, such as number or string
+	CAST  - cast the single child expression into a different data-type specified by a domain node
 	COL   - use the value of a local view source column
 	MCOL  - match a result column; used mainly with MATCH view, or in 'having','order' sql elsewhere
 	VARG  - when view is a "with" sub-query, use value of an argument to the view
 	ARG   - use value of an arg to the current routine, or fetch 'into' it if INTO view part
 	VAR   - use value of a variable declared in the current routine, or fetch 'into' it if INTO view part
-	CAST  - cast the single child expression into a different data-type specified by a domain node
 	SEQN  - use "next" value from a named user defined sequence generator (schema object)
 	CVIEW - use result of a call to a view, such as a subquery or a cursor
 	SFUNC - use result of a call to a standard built-in function (or directive); one of standard_func
@@ -2041,13 +2041,13 @@ Attribute List:
 	view_col - N.view_col - MCEE(view_part=RESULT|INTO) - the view interface/result column we are defining the value of
 	set_view_col - N.view_src_col - MCEE(view_part=SET) - this is the column we are setting the value of in insert or update op
 	view_src_arg - N.view_src_arg - MCEE(view_part=FROM) - arg of named subquery used in "from" we are passing value to
+	domain - N.domain - MCEE(expr_type=LIT|CAST) - cast curr LIT expr or single CAST child expression into this data type / domain
 	lit_val - L.misc - MCEE(expr_type=LIT) - the literal value of this expression
 	src_col - N.view_src_col - MCEE(expr_type=COL) - the source table/view column to read the value of
 	match_col - N.view_col - MCEE(expr_type=MCOL) - ref res col inst of src col; only MATCH views can in "where", all cn [hv,ord]
 	view_arg - N.view_arg - MCEE(expr_type=VARG) - if the current view is a subquery, read value of an argument to it
 	routine_arg - N.routine_arg - MCEE(expr_type=ARG) - the current routine argument to read the value of
 	routine_var - N.routine_var - MCEE(expr_type=VAR) - the current routine variable to read the value of
-	domain - N.domain - MCEE(expr_type=CAST) - cast single child expression into this data type / domain
 	sequence - N.sequence - MCEE(expr_type=SEQN) - the sequence generator we will get the "next" value for
 	call_view - N.view - MCEE(expr_type=CVIEW) - the view/subquery we will invoke; subquery is child of cont view
 	call_view_arg - N.view_arg - if parent expr set call_view, name view arg that curr expr passes value to
@@ -2270,10 +2270,10 @@ Attribute List:
 	expr_type - E.basic_expr_type - MA - what type of expression this is; eg: literal, variable, function
 	p_expr - N.routine_expr - PP - parent expression of this one, if any; empty if this is the root expression
 	p_stmt - N.routine_stmt - PP - MCR(p_expr) - unique identifier for routine routine_stmt this expression is part of
+	domain - N.domain - MCEE(expr_type=LIT|CAST) - cast curr LIT expr or single CAST child expression into this data type / domain
 	lit_val - L.misc - MCEE(expr_type=LIT) - the literal value of this expression
 	routine_arg - N.routine_arg - MCEE(expr_type=ARG) - the current routine argument to read the value of (or bind to if OUT arg)
 	routine_var - N.routine_var - MCEE(expr_type=VAR) - the current routine variable to read the value of (or bind to if OUT arg)
-	domain - N.domain - MCEE(expr_type=CAST) - cast single child expression into this data type / domain
 	sequence - N.sequence - MCEE(expr_type=SEQN) - the sequence generator we will get the "next" value for
 	call_sfunc - E.standard_func - MCEE(expr_type=SFUNC) - the standard built-in function we will invoke
 	call_ufunc - N.routine - MCEE(expr_type=UFUNC) - the user-defined stored function we are calling

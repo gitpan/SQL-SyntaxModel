@@ -1,3 +1,27 @@
+2004-06-26   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.35.
+
+	* Updated external dependencies on Locale::KeyedText to v0.04.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.22).  Changed the
+	position of 'CAST' in the basic_expr_type enumerated list.  Updated the
+	'view_expr' and 'routine_expr' Nodes to move the 'domain' attribute to just
+	above the 'lit_val' attribute.  Also, 'domain' is now mandatory for
+	'expr_type' of ['LIT', 'CAST'], rather than just 'CAST'.  As a result of
+	this change, external SQL generating code now has the necessary info for
+	how to properly quote or escape literal values being inserted into SQL.
+
+	* Updated SyntaxModel.pm to add a new "next free node id" hash ref
+	Container property.  Added new Container method get_next_free_node_id() to
+	fetch the property.  Updated the Node methods set_node_id() and
+	put_in_container() to update the property.  The new method can be used as a
+	convenient sequence generator for new Node Ids; one suggested time for
+	using it is when building a SQL::SyntaxModel by scanning a database schema.
+	Added two new messages to en.pm (now v0.07) for the new method.  Updated
+	the test suite in t_SQL_SyntaxModel.pm to use the new sequence generator,
+	thereby simplifying the test code.  Corresponding SSM SYNOPSIS update.
+
 2004-06-21   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.34.

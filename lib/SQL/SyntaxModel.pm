@@ -11,9 +11,9 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.21';
+$VERSION = '0.22';
 
-use Locale::KeyedText 0.03;
+use Locale::KeyedText 0.04;
 
 ######################################################################
 
@@ -25,7 +25,7 @@ Standard Modules: I<none>
 
 Nonstandard Modules: 
 
-	Locale::KeyedText 0.03 (for error messages)
+	Locale::KeyedText 0.04 (for error messages)
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -76,7 +76,14 @@ practical way of suggesting improvements to the standard version.
 my $CPROP_ALL_NODES = 'all_nodes'; # hash of hashes of Node refs; find any Node by node_type:node_id quickly
 my $CPROP_PSEUDONODES = 'pseudonodes'; # hash of arrays of Node refs
 	# This property is for remembering the insert order of Nodes having hardwired pseudonode parents
+my $CPROP_NEXT_FREE_NIDS = 'next_free_nids'; # hash (enum,id); next free node ids per node type
+	# Each property key is a valid node type, and the associated value is an integer that 
+	# is one higher than the highest Node ID that is or was in use by a Node in this Container.
 #my $CPROP_CURR_NODE = 'curr_node'; # ref to a Node; used when "streaming" to or from XML
+	# I may instead make a new inner class for this, and there can be several of these 
+	# per container, such as if multiple streams are working in different areas at once; 
+	# any Container property would then just have a list of those active objects, 
+	# so they can be killed (return links to Container obj broken) if their Container is destroyed.
 # To do: have attribute to indicate an edit in progress 
 	# or that there was a failure resulting in inconsistant data;
 	# this may be set by a method which partly implements a data change 
@@ -164,7 +171,7 @@ my %ENUMERATED_TYPES = (
 		RESULT INTO SET FROM WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
 	) },
 	'basic_expr_type' => { map { ($_ => 1) } qw(
-		LIT COL MCOL VARG ARG VAR CAST SEQN CVIEW SFUNC UFUNC LIST
+		LIT CAST COL MCOL VARG ARG VAR SEQN CVIEW SFUNC UFUNC LIST
 	) },
 	'standard_func' => { map { ($_ => 1) } qw(
 		NOT AND OR XOR
@@ -681,7 +688,7 @@ my %NODE_TYPES = (
 	'view_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id expr_type p_expr view view_part view_col set_view_col view_src_arg 
-			lit_val src_col match_col view_arg routine_arg routine_var domain sequence 
+			domain lit_val src_col match_col view_arg routine_arg routine_var sequence 
 			call_view call_view_arg call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
@@ -698,12 +705,12 @@ my %NODE_TYPES = (
 			'view_col' => 'view_col',
 			'set_view_col' => 'view_src_col',
 			'view_src_arg' => 'view_src_arg',
+			'domain' => 'domain',
 			'src_col' => 'view_src_col',
 			'match_col' => 'view_col',
 			'view_arg' => 'view_arg',
 			'routine_arg' => 'routine_arg',
 			'routine_var' => 'routine_var',
-			'domain' => 'domain',
 			'sequence' => 'sequence',
 			'call_view' => 'view',
 			'call_view_arg' => 'view_arg',
@@ -726,12 +733,12 @@ my %NODE_TYPES = (
 			'view_col' => ['view_part', 'RESULT', 'view_part', 'INTO'],
 			'set_view_col' => ['view_part', 'SET'],
 			'view_src_arg' => ['view_part', 'FROM'],
+			'domain' => ['expr_type', 'LIT', 'expr_type', 'CAST'],
 			'src_col' => ['expr_type', 'COL'],
 			'match_col' => ['expr_type', 'MCOL'],
 			'view_arg' => ['expr_type', 'VARG'],
 			'routine_arg' => ['expr_type', 'ARG'],
 			'routine_var' => ['expr_type', 'VAR'],
-			'domain' => ['expr_type', 'CAST'],
 			'sequence' => ['expr_type', 'SEQN'],
 			'call_view' => ['expr_type', 'CVIEW'],
 			'call_ufunc' => ['expr_type', 'UFUNC'],
@@ -859,7 +866,7 @@ my %NODE_TYPES = (
 	},
 	'routine_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id expr_type p_expr p_stmt lit_val routine_arg routine_var domain sequence 
+			id expr_type p_expr p_stmt domain lit_val routine_arg routine_var sequence 
 			call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
@@ -872,9 +879,9 @@ my %NODE_TYPES = (
 		$TPI_AT_NREFS => {
 			'p_expr' => 'routine_expr',
 			'p_stmt' => 'routine_stmt',
+			'domain' => 'domain',
 			'routine_arg' => 'routine_arg',
 			'routine_var' => 'routine_var',
-			'domain' => 'domain',
 			'sequence' => 'sequence',
 			'call_ufunc' => 'routine',
 			'call_ufunc_arg' => 'routine_arg',
@@ -891,9 +898,9 @@ my %NODE_TYPES = (
 			'call_sfunc' => ['expr_type', 'SFUNC'],
 		},
 		$TPI_MCEE_NREFS => {
+			'domain' => ['expr_type', 'LIT', 'expr_type', 'CAST'],
 			'routine_arg' => ['expr_type', 'ARG'],
 			'routine_var' => ['expr_type', 'VAR'],
-			'domain' => ['expr_type', 'CAST'],
 			'sequence' => ['expr_type', 'SEQN'],
 			'call_ufunc' => ['expr_type', 'UFUNC'],
 		},
@@ -1299,6 +1306,7 @@ sub new {
 	my $container = bless( {}, ref($class) || $class );
 	$container->{$CPROP_ALL_NODES} = { map { ($_ => {}) } keys %NODE_TYPES };
 	$container->{$CPROP_PSEUDONODES} = { map { ($_ => []) } @L2_PSEUDONODE_LIST };
+	$container->{$CPROP_NEXT_FREE_NIDS} = { map { ($_ => 1) } keys %NODE_TYPES };
 	return( $container );
 }
 
@@ -1341,6 +1349,17 @@ sub get_child_nodes {
 	} else {
 		return( [map { @{$pseudonodes->{$_}} } @L2_PSEUDONODE_LIST] );
 	}
+}
+
+######################################################################
+
+sub get_next_free_node_id {
+	my ($container, $node_type) = @_;
+	defined( $node_type ) or $container->_throw_error_message( 'SSM_C_GET_NFNI_NO_ARG_TYPE' );
+	unless( $NODE_TYPES{$node_type} ) {
+		$container->_throw_error_message( 'SSM_C_GET_NFNI_BAD_TYPE', { 'TYPE' => $node_type } );
+	}
+	return( $container->{$CPROP_NEXT_FREE_NIDS}->{$node_type} );
 }
 
 ######################################################################
@@ -1482,6 +1501,12 @@ sub set_node_id {
 	$rh_cnl_ft->{$new_id} = $node; # temp reserve new+old
 	$node->{$NPROP_NODE_ID} = $new_id; # change self from old to new
 	delete( $rh_cnl_ft->{$old_id} ); # now only new reserved
+
+	# Now adjust our "next free node id" counter if appropriate
+	my $rh_cnfni = $node->{$NPROP_CONTAINER}->{$CPROP_NEXT_FREE_NIDS};
+	if( $new_id >= $rh_cnfni->{$node_type} ) {
+		$rh_cnfni->{$node_type} = 1 + $new_id;
+	}
 }
 
 ######################################################################
@@ -1983,6 +2008,12 @@ sub put_in_container {
 	$node->{$NPROP_AT_NREFS} = \%at_nodes_refs;
 	$rh_cnl_bt->{$node_type}->{$node_id} = $node;
 	# We don't get referenced nodes to link back here; caller requests that separately
+
+	# Now adjust our "next free node id" counter if appropriate
+	my $rh_cnfni = $node->{$NPROP_CONTAINER}->{$CPROP_NEXT_FREE_NIDS};
+	if( $node_id >= $rh_cnfni->{$node_type} ) {
+		$rh_cnfni->{$node_type} = 1 + $node_id;
+	}
 }
 
 sub take_from_container {
@@ -2489,70 +2520,70 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
 				<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-					<view id="2" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
-						<view_src id="3" view="2" name="person" match_table="1" />
+					<view id="1" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
+						<view_src id="1" view="1" name="person" match_table="1" />
 					</view>
-					<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
-					<routine_stmt id="5" routine="1" stmt_type="SPROC" call_sproc="CURSOR_OPEN">
-						<routine_expr id="6" expr_type="VAR" p_stmt="5" routine_var="4" />
+					<routine_var id="1" routine="1" name="person_cursor" var_type="CURSOR" curs_view="1" />
+					<routine_stmt id="1" routine="1" stmt_type="SPROC" call_sproc="CURSOR_OPEN">
+						<routine_expr id="1" expr_type="VAR" p_stmt="1" routine_var="1" />
 					</routine_stmt>
-					<routine_stmt id="7" routine="1" stmt_type="RETURN">
-						<routine_expr id="8" expr_type="VAR" p_stmt="7" routine_var="4" />
+					<routine_stmt id="2" routine="1" stmt_type="RETURN">
+						<routine_expr id="2" expr_type="VAR" p_stmt="2" routine_var="1" />
 					</routine_stmt>
 				</routine>
-				<routine id="9" routine_type="ANONYMOUS" application="2" name="insert_a_person">
-					<routine_arg id="10" routine="9" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<routine_arg id="11" routine="9" name="arg_person_name" var_type="SCALAR" domain="2" />
-					<routine_arg id="12" routine="9" name="arg_father_id" var_type="SCALAR" domain="1" />
-					<routine_arg id="13" routine="9" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="14" view_type="MATCH" name="insert_a_person" routine="9">
-						<view_src id="15" view="14" name="person" match_table="1">
-							<view_src_col id="16" src="15" match_table_col="1" />
-							<view_src_col id="17" src="15" match_table_col="2" />
-							<view_src_col id="18" src="15" match_table_col="3" />
-							<view_src_col id="19" src="15" match_table_col="4" />
+				<routine id="2" routine_type="ANONYMOUS" application="2" name="insert_a_person">
+					<routine_arg id="1" routine="2" name="arg_person_id" var_type="SCALAR" domain="1" />
+					<routine_arg id="2" routine="2" name="arg_person_name" var_type="SCALAR" domain="2" />
+					<routine_arg id="3" routine="2" name="arg_father_id" var_type="SCALAR" domain="1" />
+					<routine_arg id="4" routine="2" name="arg_mother_id" var_type="SCALAR" domain="1" />
+					<view id="2" view_type="MATCH" name="insert_a_person" routine="2">
+						<view_src id="2" view="2" name="person" match_table="1">
+							<view_src_col id="1" src="2" match_table_col="1" />
+							<view_src_col id="2" src="2" match_table_col="2" />
+							<view_src_col id="3" src="2" match_table_col="3" />
+							<view_src_col id="4" src="2" match_table_col="4" />
 						</view_src>
-						<view_expr id="20" expr_type="ARG" view="14" view_part="SET" set_view_col="16" routine_arg="10" />
-						<view_expr id="21" expr_type="ARG" view="14" view_part="SET" set_view_col="17" routine_arg="11" />
-						<view_expr id="22" expr_type="ARG" view="14" view_part="SET" set_view_col="18" routine_arg="12" />
-						<view_expr id="23" expr_type="ARG" view="14" view_part="SET" set_view_col="19" routine_arg="13" />
+						<view_expr id="1" expr_type="ARG" view="2" view_part="SET" set_view_col="1" routine_arg="1" />
+						<view_expr id="2" expr_type="ARG" view="2" view_part="SET" set_view_col="2" routine_arg="2" />
+						<view_expr id="3" expr_type="ARG" view="2" view_part="SET" set_view_col="3" routine_arg="3" />
+						<view_expr id="4" expr_type="ARG" view="2" view_part="SET" set_view_col="4" routine_arg="4" />
 					</view>
-					<routine_stmt id="24" routine="9" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="14" />
+					<routine_stmt id="3" routine="2" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="2" />
 				</routine>
-				<routine id="25" routine_type="ANONYMOUS" application="2" name="update_a_person">
-					<routine_arg id="26" routine="25" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
-					<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
-					<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="30" view_type="MATCH" name="update_a_person" routine="25">
-						<view_src id="31" view="30" name="person" match_table="1">
-							<view_src_col id="32" src="31" match_table_col="1" />
-							<view_src_col id="33" src="31" match_table_col="2" />
-							<view_src_col id="34" src="31" match_table_col="3" />
-							<view_src_col id="35" src="31" match_table_col="4" />
+				<routine id="3" routine_type="ANONYMOUS" application="2" name="update_a_person">
+					<routine_arg id="5" routine="3" name="arg_person_id" var_type="SCALAR" domain="1" />
+					<routine_arg id="6" routine="3" name="arg_person_name" var_type="SCALAR" domain="2" />
+					<routine_arg id="7" routine="3" name="arg_father_id" var_type="SCALAR" domain="1" />
+					<routine_arg id="8" routine="3" name="arg_mother_id" var_type="SCALAR" domain="1" />
+					<view id="3" view_type="MATCH" name="update_a_person" routine="3">
+						<view_src id="3" view="3" name="person" match_table="1">
+							<view_src_col id="5" src="3" match_table_col="1" />
+							<view_src_col id="6" src="3" match_table_col="2" />
+							<view_src_col id="7" src="3" match_table_col="3" />
+							<view_src_col id="8" src="3" match_table_col="4" />
 						</view_src>
-						<view_expr id="36" expr_type="ARG" view="30" view_part="SET" set_view_col="33" routine_arg="27" />
-						<view_expr id="37" expr_type="ARG" view="30" view_part="SET" set_view_col="34" routine_arg="28" />
-						<view_expr id="38" expr_type="ARG" view="30" view_part="SET" set_view_col="35" routine_arg="29" />
-						<view_expr id="39" expr_type="SFUNC" view="30" view_part="WHERE" call_sfunc="EQ">
-							<view_expr id="40" expr_type="COL" p_expr="39" src_col="32" />
-							<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
+						<view_expr id="5" expr_type="ARG" view="3" view_part="SET" set_view_col="6" routine_arg="6" />
+						<view_expr id="6" expr_type="ARG" view="3" view_part="SET" set_view_col="7" routine_arg="7" />
+						<view_expr id="7" expr_type="ARG" view="3" view_part="SET" set_view_col="8" routine_arg="8" />
+						<view_expr id="8" expr_type="SFUNC" view="3" view_part="WHERE" call_sfunc="EQ">
+							<view_expr id="9" expr_type="COL" p_expr="8" src_col="5" />
+							<view_expr id="10" expr_type="ARG" p_expr="8" routine_arg="5" />
 						</view_expr>
 					</view>
-					<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="30" />
+					<routine_stmt id="4" routine="3" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="3" />
 				</routine>
-				<routine id="43" routine_type="ANONYMOUS" application="2" name="delete_a_person">
-					<routine_arg id="44" routine="43" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<view id="45" view_type="MATCH" name="delete_a_person" routine="43">
-						<view_src id="46" view="45" name="person" match_table="1">
-							<view_src_col id="47" src="46" match_table_col="1" />
+				<routine id="4" routine_type="ANONYMOUS" application="2" name="delete_a_person">
+					<routine_arg id="9" routine="4" name="arg_person_id" var_type="SCALAR" domain="1" />
+					<view id="4" view_type="MATCH" name="delete_a_person" routine="4">
+						<view_src id="4" view="4" name="person" match_table="1">
+							<view_src_col id="9" src="4" match_table_col="1" />
 						</view_src>
-						<view_expr id="48" expr_type="SFUNC" view="45" view_part="WHERE" call_sfunc="EQ">
-							<view_expr id="49" expr_type="COL" p_expr="48" src_col="47" />
-							<view_expr id="50" expr_type="ARG" p_expr="48" routine_arg="44" />
+						<view_expr id="11" expr_type="SFUNC" view="4" view_part="WHERE" call_sfunc="EQ">
+							<view_expr id="12" expr_type="COL" p_expr="11" src_col="9" />
+							<view_expr id="13" expr_type="ARG" p_expr="11" routine_arg="9" />
 						</view_expr>
 					</view>
-					<routine_stmt id="51" routine="43" stmt_type="SPROC" call_sproc="DELETE" view_for_dml="45" />
+					<routine_stmt id="5" routine="4" stmt_type="SPROC" call_sproc="DELETE" view_for_dml="4" />
 				</routine>
 			</application>
 		</blueprints>
@@ -2657,27 +2688,27 @@ named bind variable if un-named client-side SQL is generated) and performs an
 UPDATE query against one table record; the query takes 4 arguments, using one
 to match a record and 3 as new record column values to set.
 
-	<routine id="25" routine_type="ANONYMOUS" application="2" name="update_a_person">
-		<routine_arg id="26" routine="25" name="arg_person_id" var_type="SCALAR" domain="1" />
-		<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
-		<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
-		<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-		<view id="30" view_type="MATCH" name="update_a_person" routine="25">
-			<view_src id="31" view="30" name="person" match_table="1">
-				<view_src_col id="32" src="31" match_table_col="1" />
-				<view_src_col id="33" src="31" match_table_col="2" />
-				<view_src_col id="34" src="31" match_table_col="3" />
-				<view_src_col id="35" src="31" match_table_col="4" />
+	<routine id="3" routine_type="ANONYMOUS" application="2" name="update_a_person">
+		<routine_arg id="5" routine="3" name="arg_person_id" var_type="SCALAR" domain="1" />
+		<routine_arg id="6" routine="3" name="arg_person_name" var_type="SCALAR" domain="2" />
+		<routine_arg id="7" routine="3" name="arg_father_id" var_type="SCALAR" domain="1" />
+		<routine_arg id="8" routine="3" name="arg_mother_id" var_type="SCALAR" domain="1" />
+		<view id="3" view_type="MATCH" name="update_a_person" routine="3">
+			<view_src id="3" view="3" name="person" match_table="1">
+				<view_src_col id="5" src="3" match_table_col="1" />
+				<view_src_col id="6" src="3" match_table_col="2" />
+				<view_src_col id="7" src="3" match_table_col="3" />
+				<view_src_col id="8" src="3" match_table_col="4" />
 			</view_src>
-			<view_expr id="36" expr_type="ARG" view="30" view_part="SET" set_view_col="33" routine_arg="27" />
-			<view_expr id="37" expr_type="ARG" view="30" view_part="SET" set_view_col="34" routine_arg="28" />
-			<view_expr id="38" expr_type="ARG" view="30" view_part="SET" set_view_col="35" routine_arg="29" />
-			<view_expr id="39" expr_type="SFUNC" view="30" view_part="WHERE" call_sfunc="EQ">
-				<view_expr id="40" expr_type="COL" p_expr="39" src_col="32" />
-				<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
+			<view_expr id="5" expr_type="ARG" view="3" view_part="SET" set_view_col="6" routine_arg="6" />
+			<view_expr id="6" expr_type="ARG" view="3" view_part="SET" set_view_col="7" routine_arg="7" />
+			<view_expr id="7" expr_type="ARG" view="3" view_part="SET" set_view_col="8" routine_arg="8" />
+			<view_expr id="8" expr_type="SFUNC" view="3" view_part="WHERE" call_sfunc="EQ">
+				<view_expr id="9" expr_type="COL" p_expr="8" src_col="5" />
+				<view_expr id="10" expr_type="ARG" p_expr="8" routine_arg="5" />
 			</view_expr>
 		</view>
-		<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="30" />
+		<routine_stmt id="4" routine="3" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="3" />
 	</routine>
 
 The above Node group, *together* with the previous Node group, has details to
@@ -3193,6 +3224,19 @@ Container whose Node Type defines them as always having a pseudo-Node parent.
 If the optional argument NODE_TYPE is defined, then only child Nodes of that
 Node Type are returned; otherwise, all child Nodes are returned.  All Nodes are
 returned in the same order they were added.
+
+=head2 get_next_free_node_id( NODE_TYPE )
+
+	my $node_id = $model->get_next_free_node_id( 'catalog' );
+
+This "getter" method returns an integer which is valid for use as the Node ID
+of a new Node, which has a Node Type of NODE_TYPE, that is going to be put in
+this Container.  Its value is 1 higher than the highest Node ID for the same
+Node Type that is already in the Container, or had been before.  You can use
+this method like a sequence generator to produce Node Ids for you rather than
+you producing them in some other way.  An example situation when this method
+would be useful is if you are building a SQL::SyntaxModel by scanning the
+schema of an existing database.
 
 =head2 with_all_nodes_test_mandatory_attributes()
 
