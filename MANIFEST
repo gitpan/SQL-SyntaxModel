@@ -4,11 +4,11 @@ lib/SQL/SyntaxModel.pm
 lib/SQL/SyntaxModel/API_C.pod
 lib/SQL/SyntaxModel/L/en.pm
 lib/SQL/SyntaxModel/Language.pod
-lib/t_SQL_SyntaxModel.pm
 LICENSE
 Makefile.PL
 MANIFEST
 META.yml                                Module meta-data (added by MakeMaker)
 ReadMe
+t/lib/t_SQL_SyntaxModel.pm
 t/SQL_SyntaxModel.t
 TODO

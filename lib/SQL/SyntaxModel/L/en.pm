@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 ######################################################################
 
@@ -243,7 +243,7 @@ my %text_strings = (
 		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because its Node Id value of '{ID}' is already in use by another '{TYPE}' Node ".
 		"in the same Container; one of them needs to be changed first",
-	'SSM_N_PI_CONT_NONEX_AT_NODE' => 
+	'SSM_N_PI_CONT_NONEX_AT_NREF' => 
 		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because the Node attribute named '{ATNM}' expects to link to a '{TYPE}' Node ".
 		"with a Node Id of '{ID}', but no such Node exists in the given Container",
@@ -303,49 +303,55 @@ my %text_strings = (
 
 	'SSM_N_TEDC_NID_VAL_NO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node has failed a test; ".
-		"the Node ID must be given a value",
+		"its Node ID must be given a value",
+	'SSM_N_TEDC_P_NODE_ATNM_NOT_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"its Primary Parent Node Attribute Name must be given a value ".
+		"(this Node type does not have a pseudo-Node parent)",
+	'SSM_N_TEDC_PP_TOO_MANY_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"{NUMVALS} of its primary parent Node attributes ({ATNMS}) are set; ".
+		"you must change all but one of them to be undefined/null",
+	'SSM_N_TEDC_PP_ZERO_SET' => 
+		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"none of its primary parent Node attributes ({ATNMS}) are are set; ".
+		"you must give a value to exactly one of them",
 	'SSM_N_TEDC_MA_LIT_VAL_NO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the literal attribute named '{NAME}' must always be given a value",
+		"the literal attribute named '{ATNM}' must always be given a value",
 	'SSM_N_TEDC_MA_ENUM_VAL_NO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the enumerated attribute named '{NAME}' must always be given a value",
+		"the enumerated attribute named '{ATNM}' must always be given a value",
 	'SSM_N_TEDC_MA_NREF_VAL_NO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the node ref attribute named '{NAME}' must always be given a value",
-	'SSM_N_TEDC_NO_SINGLE_PP_SET' => 
+		"the node ref attribute named '{ATNM}' must always be given a value",
+
+	'SSM_N_TEDC_MUTEX_TOO_MANY_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"exactly one of its primary parent Node attributes ({NAMES}) must have a value, and ".
-		"the others be undefined/null, but {NUMVALS} of these attributes are set now",
-	# Note, there currently are no $TPI_MCR_LITERALS.
-	'SSM_N_TEDC_MCR_ENUM_VAL_YES_SET' => 
+		"{NUMVALS} of its attributes ({ATNMS}) in the mutual-exclusivity group '{MUTEX}' are set; ".
+		"you must change all but one of them to be undefined/null",
+	'SSM_N_TEDC_MUTEX_ZERO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the enumerated attribute named '{NAME}' must be left undefined/null when the same ".
-		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
-	'SSM_N_TEDC_MCR_ENUM_VAL_NO_SET' => 
+		"none of its attributes ({ATNMS}) in the mutual-exclusivity group '{MUTEX}' are set; ".
+		"you must give a value to exactly one of them",
+
+	'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the enumerated attribute named '{NAME}' must be given a value when the same ".
-		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
-	'SSM_N_TEDC_MCR_NREF_VAL_YES_SET' => 
+		"the depended-on attribute '{DEP_ON}' is undef/null so all of its dependents must be too; ".
+		"you must clear these {NUMVALS} attributes: {ATNMS}",
+	'SSM_N_TEDC_LATDP_DEP_ON_HAS_WRONG_VAL' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the node ref attribute named '{NAME}' must be left undefined/null when the same ".
-		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
-	'SSM_N_TEDC_MCR_NREF_VAL_NO_SET' => 
+		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which is different ".
+		"than the value(s) that certain dependents require for being set; ".
+		"you must clear these {NUMVALS} attributes: {ATNMS}",
+	'SSM_N_TEDC_LATDP_TOO_MANY_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the node ref attribute named '{NAME}' must be given a value when the same ".
-		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
-	'SSM_N_TEDC_MCEE_LIT_VAL_NO_SET' => 
+		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which means that ".
+		"only one of these {NUMVALS} currently set dependent attributes may be set: {ATNMS}",
+	'SSM_N_TEDC_LATDP_ZERO_SET' => 
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the literal attribute named '{NAME}' must be given a value when the same ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEDC_MCEE_ENUM_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the enumerated attribute named '{NAME}' must be given a value when the same ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEDC_MCEE_NREF_VAL_NO_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the node ref attribute named '{NAME}' must be given a value when the same ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
+		"the depended-on attribute '{DEP_ON}' has a value of '{DEP_ON_VAL}', which means that ".
+		"exactly one of these dependent attributes must be set: {ATNMS}",
 );
 
 ######################################################################

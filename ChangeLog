@@ -1,3 +1,55 @@
+2004-08-31   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.40.
+
+	* New code file versions are: SyntaxModel.pm v0.40, en.pm v0.12.
+
+	* Many updates to Language.pod and SyntaxModel.pm and en.pm such that all
+	of the deferrable constraints were rewritten; the scope of these
+	constraints is still roughly the same, such that all validation tests
+	performed on a Node restrict themselves to examining that same Node only
+	(multi-Node tests are planned for v0.41), but they now test not only when
+	each attribute should be valued, but also when each should *not* be valued.
+	In SyntaxModel.pm, nearly all of the changes were in the
+	Node.test_deferrable_constraints() method and the internal %NODE_TYPES
+	configuration data structure, plus 3 of the static information functions. 
+	In Language.pod, all of the changes were in the NODE TYPES main
+	documentation intro section, plus its sub-sections for each Node type.  For
+	each Node, the "Attribute List" was split into itself plus the "Exclusive
+	Attribute Groups List" and the "Local Attribute Dependencies List" (no
+	changes were made to "Unique Constraint List" or "Example List").  The MA
+	(always-mandatory) flags for single attributes no longer appear on the same
+	attributes that are either NODE_ID (id) or PP (primary-parent), where they
+	are now redundant.  The MCEE flags were removed in favor of a much superior
+	implementation in "Local Attribute Dependencies List".  The few MCR flags
+	were removed as being redundant with the much more complete "Exclusive
+	Attribute Groups List".  The recursive-parent attribute in %NODE_TYPES was
+	removed due to being superfluous.  The 3 %NODE_TYPES keys for MA were
+	merged into one.  All en.pm messages for TEDC were replaced.  Now all
+	%NODE_TYPES constructs are array based, except for _AT_ ones.
+
+	* Rewrote Container.test_deferrable_constraints() so that it now tests a
+	Container's Nodes in the same order that they exist in the logical tree,
+	meaning the same order that get_all_properties() fetches them, rather than
+	in the apparently random order having all Nodes of a type done together. 
+	As a result, you should have a much easier time in tracking down any input
+	errors in your own code, or of predicting which of several existing errors
+	will be reported first.  Part of the rewrite involved splitting the method 
+	into itself and the private _test_deferrable_constraints().
+
+	* Added 2 new attributes [set_routine_arg, set_routine_var] to view_expr
+	Nodes, which are used by INTO clauses; the older [set_routine, set_routine]
+	attributes no longer have a dual role that includes this; updated docs.
+
+	* Renamed one miscellaneous message key in SyntaxModel.pm and en.pm.  Made
+	a few other minor documentation fixes in SyntaxModel.pm.
+
+	* Moved this distribution's t_*.pm file from the /lib directory to a new
+	/t/lib directory, so that it doesn't pollute the user's install
+	directories, and so the distribution is better organized on the whole. 
+	Added a "use lib 't/lib';" to SQL_SyntaxModel.t in order to make the move
+	work.  No changes to the tests themselves.  Updated the MANIFEST.
+
 2004-08-26   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.39.

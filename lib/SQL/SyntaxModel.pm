@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.39';
+$VERSION = '0.40';
 
 use Locale::KeyedText 0.06;
 
@@ -121,22 +121,22 @@ my $NPROP_AT_ENUMS    = 'at_enums'; # hash (enum,enum) - attrs of Node which are
 my $NPROP_AT_NREFS    = 'at_nrefs'; # hash (enum,Node) - attrs of Node which point to other Nodes (or ids rep other Nodes)
 	# C version of this will be either multiple arrays or a single array of structs, to handle pointer vs uint
 	# Hash elements can only be actual references when Node is in a Container, and pointed to must be in same
-	# When converting to XML, if P_NODE_ATNM is set, the AT_NODE it refers to won't become an XML attr (redundant)
-my $NPROP_P_NODE_ATNM = 'p_node_atnm'; # str (enum) - name of AT_NODES elem having our primary parent Node, if any
-	# When this property is valued, there is no implication that the corres AT_NODES is also valued
+	# When converting to XML, if P_NODE_ATNM is set, the AT_NREF it refers to won't become an XML attr (redundant)
+my $NPROP_P_NODE_ATNM = 'p_node_atnm'; # str (enum) - name of AT_NREFS elem having our primary parent Node, if any
+	# When this property is valued, there is no implication that the corres AT_NREFS is also valued
 	# C version of this will be an enumerated value.
 	# Since a Node of one type may have a parent Node of multiple possible types, 
 	# this tells us not only which type but which instance it is.
 	# This property will be undefined if either there is no parent or the parent is a pseudo-node.
 my $NPROP_CONTAINER   = 'container'; # ref to Container this Node lives in
 	# C version of this would be a pointer to a Container struct
-my $NPROP_LINKS_RECIP = 'links_recip'; # boolean - false by def, true when our actual refs in AT_NODES are reciprocated
+my $NPROP_LINKS_RECIP = 'links_recip'; # boolean - false by def, true when our actual refs in AT_NREFS are reciprocated
 	# C version of this will be an integer used like a boolean.
 my $NPROP_CHILD_NODES = 'child_nodes'; # array - list of refs to other Nodes having actual refs to this one
-	# We use this to reciprocate actual refs from the AT_NODES property of other Nodes to us.
+	# We use this to reciprocate actual refs from the AT_NREFS property of other Nodes to us.
 	# When converting to XML, we only render once, beneath the Node which we refer to in our P_NODE_ATNM.
 	# C version will be a double-linked list with each element representing a Node struct.
-	# It is important to ensure that if a Node links to us multiple times (via multiple AT_NODES) 
+	# It is important to ensure that if a Node links to us multiple times (via multiple AT_NREFS) 
 	# then we include the other Node in our child list just as many times; eg: 2 here means 2 back; 
 	# however, when rendering to XML, we only render a Node once, and not as many times as linked; 
 	# it is also possible that we may never be put in this situation from real-world usage.
@@ -245,32 +245,30 @@ my %ENUMERATED_TYPES = (
 
 # Names of hash keys in %NODE_TYPES elements:
 my $TPI_AT_SEQUENCE  = 'at_sequence'; # Array of all 'attribute' names in canon order
-my $TPI_AT_LITERALS  = 'at_literals'; # Keys are attr names a Node can have which have literal values
+my $TPI_AT_LITERALS  = 'at_literals'; # Hash - Keys are attr names a Node can have which have literal values
 	# Values are enums and say what literal data type the attribute has, like int or bool or str
-my $TPI_AT_ENUMS     = 'at_enums'; # Keys are attr names a Node can have which are enumerated values
+my $TPI_AT_ENUMS     = 'at_enums'; # Hash - Keys are attr names a Node can have which are enumerated values
 	# Values are enums and match a %ENUMERATED_TYPES key
-my $TPI_AT_NREFS     = 'at_nrefs'; # Keys are attr names a Node can have which are Node Ref/Id values
+my $TPI_AT_NREFS     = 'at_nrefs'; # Hash - Keys are attr names a Node can have which are Node Ref/Id values
 	# Values are enums and each matches a single %NODE_TYPES key.
-my $TPI_P_NODE_ATNMS = 'p_node_atnms'; # Keys match keys of AT_NREFS (P_NODE_ATNMS is a list subset)
-	# Values are meaningless; they simply are the truth value of 1
+my $TPI_P_NODE_ATNMS = 'p_node_atnms'; # Array whose elements match keys of AT_NREFS (P_NODE_ATNMS is a list subset)
 my $TPI_P_PSEUDONODE = 'p_pseudonode'; # If set, Nodes of this type have a hard-coded pseudo-parent
-my $TPI_R_P_NODE_ATNM = 'r_p_node_atnm'; # If this Node type can form a tree because they 
-	# are directly recursive, then this is the primary parent Node attr name used for recursion; 
-	# when this Node attribute is clear, then the current Node is the root of its tree.
-my $TPI_MA_LITERALS  = 'ma_literals'; # Mandatory literals attributes; keys=atnms, values = 1
-	# 'MA' means 'Mandatory Always'.
-my $TPI_MA_ENUMS     = 'ma_enums'; # Mandatory enums attributes; keys=atnms, values = 1
-my $TPI_MA_NREFS     = 'ma_nrefs'; # Mandatory nrefs attributes; keys=atnms, values = 1
-# Note, there currently are no $TPI_MCR_LITERALS.
-my $TPI_MCR_ENUMS    = 'mcr_enums'; # keys = attribute names, values = 1
-	# 'MCR' means 'Mandatory Conditionally on this node being a Root among its own node type'.
-my $TPI_MCR_NREFS    = 'mcr_nrefs'; # see previous
-my $TPI_MCEE_LITERALS = 'mcee_literals'; # key is MC atnm, val=array of condition-pairs to check
-	# 'MCEE' means 'Mandatory Conditionally on Enumerated value being Equal to X'.
-	# Each pair of values in the condition is an enumerated attr to check and value to check for;
-	# the attribute which is MC is mandatory if any condition-pair is true.
-my $TPI_MCEE_ENUMS    = 'mcee_enums'; # see previous
-my $TPI_MCEE_NREFS    = 'mcee_nrefs'; # see previous
+my $TPI_MA_ATTRS     = 'ma_attrs'; # Array of always-mandatory ('MA') attributes
+	# The array contains 3 elements, one each for lit, enum, nref; each inner elem is a MA boolean
+my $TPI_MUTEX_ATGPS  = 'mutex_atgps'; # Array of groups of mutually exclusive attributes
+	# Each array element is an array ref with 5 elements: 1. mutex-name (cstr); 2. lit members (ary); 
+	# 3. enum members (ary); 4. nref members (ary); 5. mandatory-flag (boolean).
+my $TPI_LOCAL_ATDPS  = 'local_atdps'; # Array of attributes depended-on by other attrs in same Nodes
+	# Each array element is an array ref with 4 elements: 
+	# 1. undef or depended on lit attr name (cstr); 2. undef or depended on enum attr name (cstr); 
+	# 3. undef or depended on nref attr name (cstr); 4. an array ref of N elements where 
+	# each element is an array ref with 5 elements: 
+		# 1. an array ref with 0..N elements that are names of dependent lit attrs; 
+		# 2. an array ref with 0..N elements that are names of dependent enum attrs; 
+		# 3. an array ref with 0..N elements that are names of dependent nref attrs; 
+		# 4. an array ref with 0..N elements that are depended-on values, one of which must 
+		# be matched, if depended-on attr is an enum, or which is empty otherwise;
+		# 5. mandatory-flag (boolean).
 
 # Names of special "pseudo-nodes" that are used in an XML version of this structure.
 my $SQLSM_L1_ROOT_PSND = 'root';
@@ -312,7 +310,6 @@ my %NODE_TYPES = (
 			'catalog' => 'catalog',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog )},
 	},
 	'catalog_link' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -327,8 +324,7 @@ my %NODE_TYPES = (
 			'target' => 'catalog',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog application )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( target )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[qw( target )]],
 	},
 	'schema' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -342,8 +338,7 @@ my %NODE_TYPES = (
 			'owner' => 'owner',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog owner )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[qw( owner )]],
 	},
 	'role' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -356,8 +351,7 @@ my %NODE_TYPES = (
 			'catalog' => 'catalog',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[]],
 	},
 	'privilege_on' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -372,7 +366,9 @@ my %NODE_TYPES = (
 			'routine' => 'routine',
 		},
 		$TPI_P_NODE_ATNMS => [qw( role )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( role )},
+		$TPI_MUTEX_ATGPS => [
+			['privilege_on',[],[],[qw( schema domain sequence table routine )],1],
+		],
 	},
 	'privilege_for' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -385,8 +381,7 @@ my %NODE_TYPES = (
 			'priv_on' => 'privilege_on',
 		},
 		$TPI_P_NODE_ATNMS => [qw( priv_on )],
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( priv_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( priv_on )},
+		$TPI_MA_ATTRS => [[],[qw( priv_type )],[]],
 	},
 	'domain' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -421,17 +416,30 @@ my %NODE_TYPES = (
 			'schema' => 'schema',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( base_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( schema )},
-		$TPI_MCEE_LITERALS => {
-			'max_octets' => ['base_type', 'STR_BIT'],
-			'max_chars' => ['base_type', 'STR_CHAR'],
-		},
-		$TPI_MCEE_ENUMS => {
-			'char_enc' => ['base_type', 'STR_CHAR'],
-			'calendar' => ['base_type', 'DATM_FULL', 'base_type', 'DATM_DATE'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( base_type )],[]],
+		$TPI_MUTEX_ATGPS => [
+			['num_size',[qw( num_precision num_octets )],[],[],0],
+		],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'base_type',undef,[
+				[['num_precision'],[],[],['NUM_INT','NUM_EXA','NUM_APR'],0],
+				[['num_scale'],[],[],['NUM_EXA','NUM_APR'],0],
+				[['num_octets'],[],[],['NUM_INT','NUM_APR'],0],
+				[['num_unsigned'],[],[],['NUM_INT','NUM_EXA','NUM_APR'],0],
+				[['max_octets'],[],[],['STR_BIT'],1],
+				[['max_chars'],[],[],['STR_CHAR'],1],
+				[[],['char_enc'],[],['STR_CHAR'],1],
+				[['trim_white'],[],[],['STR_CHAR'],0],
+				[['uc_latin','lc_latin'],[],[],['STR_CHAR'],0],
+				[['pad_char'],[],[],['STR_CHAR'],0],
+				[['trim_pad'],[],[],['STR_CHAR'],0],
+				[[],['calendar'],[],['DATM_FULL','DATM_DATE'],1],
+				[['with_zone'],[],[],['DATM_FULL','DATM_DATE','DATM_TIME'],0],
+			]],
+			['num_precision',undef,undef,[
+				[['num_scale'],[],[],[],0],
+			]],
+		],
 	},
 	'domain_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -444,8 +452,7 @@ my %NODE_TYPES = (
 			'domain' => 'domain',
 		},
 		$TPI_P_NODE_ATNMS => [qw( domain )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( value )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( domain )},
+		$TPI_MA_ATTRS => [[qw( value )],[],[]],
 	},
 	'sequence' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -464,8 +471,7 @@ my %NODE_TYPES = (
 			'schema' => 'schema',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( schema )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[]],
 	},
 	'table' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -478,8 +484,7 @@ my %NODE_TYPES = (
 			'schema' => 'schema',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( schema )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[]],
 	},
 	'table_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -497,8 +502,10 @@ my %NODE_TYPES = (
 			'default_seq' => 'sequence',
 		},
 		$TPI_P_NODE_ATNMS => [qw( table )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name mandatory )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( table domain )},
+		$TPI_MA_ATTRS => [[qw( name mandatory )],[],[qw( domain )]],
+		$TPI_MUTEX_ATGPS => [
+			['default',[qw( default_val )],[],[qw( default_seq )],0],
+		],
 	},
 	'table_ind' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -515,12 +522,12 @@ my %NODE_TYPES = (
 			'f_table' => 'table',
 		},
 		$TPI_P_NODE_ATNMS => [qw( table )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( ind_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( table )},
-		$TPI_MCEE_NREFS => {
-			'f_table' => ['ind_type', 'FOREIGN', 'ind_type', 'UFOREIGN'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( ind_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'ind_type',undef,[
+				[[],[],['f_table'],['FOREIGN','UFOREIGN'],1],
+			]],
+		],
 	},
 	'table_ind_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -532,7 +539,7 @@ my %NODE_TYPES = (
 			'f_table_col' => 'table_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( table_ind )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( table_ind table_col )},
+		$TPI_MA_ATTRS => [[],[],[qw( table_col )]],
 	},
 	'view' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -556,12 +563,13 @@ my %NODE_TYPES = (
 			'p_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema application routine p_view )],
-		$TPI_R_P_NODE_ATNM => 'p_view',
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( view_type )},
-		$TPI_MCEE_ENUMS => {
-			'compound_op' => ['view_type', 'COMPOUND'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( view_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'view_type',undef,[
+				[['match_all_cols'],[],[],['MATCH'],0],
+				[[],['compound_op'],[],['COMPOUND'],1],
+			]],
+		],
 	},
 	'view_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -575,8 +583,7 @@ my %NODE_TYPES = (
 			'domain' => 'domain',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view domain )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[qw( domain )]],
 	},
 	'view_src' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -593,8 +600,10 @@ my %NODE_TYPES = (
 			'catalog_link' => 'catalog_link',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[]],
+		$TPI_MUTEX_ATGPS => [
+			['match',[],[],[qw( match_table match_view )],1],
+		],
 	},
 	'view_src_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -605,7 +614,7 @@ my %NODE_TYPES = (
 			'match_view_arg' => 'view_arg',
 		},
 		$TPI_P_NODE_ATNMS => [qw( src )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( src match_view_arg )},
+		$TPI_MA_ATTRS => [[],[],[qw( match_view_arg )]],
 	},
 	'view_src_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -617,7 +626,9 @@ my %NODE_TYPES = (
 			'match_view_col' => 'view_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( src )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( src )},
+		$TPI_MUTEX_ATGPS => [
+			['match_col',[],[],[qw( match_table_col match_view_col )],1],
+		],
 	},
 	'view_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -632,8 +643,7 @@ my %NODE_TYPES = (
 			'src_col' => 'view_src_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view domain )},
+		$TPI_MA_ATTRS => [[qw( name )],[],[qw( domain )]],
 	},
 	'view_join' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -648,8 +658,7 @@ my %NODE_TYPES = (
 			'rhs_src' => 'view_src',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( join_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view lhs_src rhs_src )},
+		$TPI_MA_ATTRS => [[],[qw( join_type )],[qw( lhs_src rhs_src )]],
 	},
 	'view_join_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -661,7 +670,7 @@ my %NODE_TYPES = (
 			'rhs_src_col' => 'view_src_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( join )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( join lhs_src_col rhs_src_col )},
+		$TPI_MA_ATTRS => [[],[],[qw( lhs_src_col rhs_src_col )]],
 	},
 	'view_hierarchy' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -685,17 +694,24 @@ my %NODE_TYPES = (
 			'p_conn_src_col' => 'view_src_col',
 		},
 		$TPI_P_NODE_ATNMS => [qw( view )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view start_src_col conn_src_col p_conn_src_col )},
-		$TPI_MCEE_NREFS => {
-			'start_lit_val' => ['start_expr_type', 'LIT'],
-			'start_view_arg' => ['start_expr_type', 'VARG'],
-			'start_routine_arg' => ['start_expr_type', 'ARG'],
-			'start_routine_var' => ['start_expr_type', 'VAR'],
-		},
+		$TPI_MA_ATTRS => [[],[],[qw( start_src_col conn_src_col p_conn_src_col )]],
+		$TPI_MUTEX_ATGPS => [
+			['start_val',[qw( start_lit_val )],[],
+				[qw( start_view_arg start_routine_arg start_routine_var )],1],
+		],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'start_expr_type',undef,[
+				[[],[],['start_lit_val'],['LIT'],1],
+				[[],[],['start_view_arg'],['VARG'],1],
+				[[],[],['start_routine_arg'],['ARG'],1],
+				[[],[],['start_routine_var'],['VAR'],1],
+			]],
+		],
 	},
 	'view_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id expr_type p_expr view view_part view_col set_view_col view_src_arg 
+			id expr_type p_expr view view_part 
+			view_col set_routine_arg set_routine_var set_view_col view_src_arg 
 			domain lit_val src_col match_col view_arg routine_arg routine_var sequence 
 			call_view call_view_arg call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
@@ -711,6 +727,8 @@ my %NODE_TYPES = (
 			'p_expr' => 'view_expr',
 			'view' => 'view',
 			'view_col' => 'view_col',
+			'set_routine_arg' => 'routine_arg',
+			'set_routine_var' => 'routine_var',
 			'set_view_col' => 'view_src_col',
 			'view_src_arg' => 'view_src_arg',
 			'domain' => 'domain',
@@ -727,30 +745,37 @@ my %NODE_TYPES = (
 			'catalog_link' => 'catalog_link',
 		},
 		$TPI_P_NODE_ATNMS => [qw( p_expr view )],
-		$TPI_R_P_NODE_ATNM => 'p_expr',
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( expr_type )},
-		$TPI_MCR_ENUMS => {map { ($_ => 1) } qw( view_part )},
-		$TPI_MCR_NREFS => {map { ($_ => 1) } qw( view )},
-		$TPI_MCEE_LITERALS => {
-			'lit_val' => ['expr_type', 'LIT'],
-		},
-		$TPI_MCEE_ENUMS => {
-			'call_sfunc' => ['expr_type', 'SFUNC'],
-		},
-		$TPI_MCEE_NREFS => {
-			'view_col' => ['view_part', 'RESULT', 'view_part', 'INTO'],
-			'set_view_col' => ['view_part', 'SET'],
-			'view_src_arg' => ['view_part', 'FROM'],
-			'domain' => ['expr_type', 'LIT', 'expr_type', 'CAST'],
-			'src_col' => ['expr_type', 'COL'],
-			'match_col' => ['expr_type', 'MCOL'],
-			'view_arg' => ['expr_type', 'VARG'],
-			'routine_arg' => ['expr_type', 'ARG'],
-			'routine_var' => ['expr_type', 'VAR'],
-			'sequence' => ['expr_type', 'SEQN'],
-			'call_view' => ['expr_type', 'CVIEW'],
-			'call_ufunc' => ['expr_type', 'UFUNC'],
-		},
+		$TPI_MA_ATTRS => [[],[qw( expr_type )],[]],
+		$TPI_MUTEX_ATGPS => [
+			['expr_root_view_part',[],[qw( view_part )],[qw( p_expr )],1],
+			['value',[qw( lit_val )],[qw( call_sfunc )],
+				[qw( src_col match_col view_arg routine_arg routine_var sequence
+				call_view call_view_arg call_ufunc call_ufunc_arg )],1],
+		],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'view_part',undef,[
+				[[],[],['view_col'],['RESULT','INTO'],1],
+				[[],[],['set_routine_arg','set_routine_var'],['INTO'],1],
+				[[],[],['set_view_col'],['SET'],1],
+				[[],[],['view_src_arg'],['FROM'],1],
+			]],
+			[undef,'expr_type',undef,[
+				[[],[],['domain'],['LIT','CAST'],1],
+				[['lit_val'],[],[],['LIT'],1],
+				[[],[],['src_col'],['COL'],1],
+				[[],[],['match_col'],['MCOL'],1],
+				[[],[],['view_arg'],['VARG'],1],
+				[[],[],['routine_arg'],['ARG'],1],
+				[[],[],['routine_var'],['VAR'],1],
+				[[],[],['sequence'],['SEQN'],1],
+				[[],[],['call_view'],['CVIEW'],1],
+				[[],['call_sfunc'],[],['SFUNC'],1],
+				[[],[],['call_ufunc'],['UFUNC'],1],
+			]],
+			[undef,undef,'call_ufunc',[
+				[[],[],['catalog_link'],[],0],
+			]],
+		],
 	},
 	'routine' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -775,19 +800,17 @@ my %NODE_TYPES = (
 			'return_domain' => 'domain',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema application p_routine table view )],
-		$TPI_R_P_NODE_ATNM => 'p_routine',
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( routine_type )},
-		$TPI_MCEE_LITERALS => {
-			'trigger_per_stmt' => ['routine_type', 'TRIGGER'],
-		},
-		$TPI_MCEE_ENUMS => {
-			'return_var_type' => ['routine_type', 'FUNCTION'],
-			'trigger_event' => ['routine_type', 'TRIGGER'],
-		},
-		$TPI_MCEE_NREFS => {
-			'return_domain' => ['return_var_type', 'SCALAR'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( routine_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'routine_type',undef,[
+				[[],['return_var_type'],[],['ANONYMOUS','FUNCTION'],0], # TODO: make mandatory for FUNCTION only
+				[[],['trigger_event'],[],['TRIGGER'],1],
+				[['trigger_per_stmt'],[],[],['TRIGGER'],1],
+			]],
+			[undef,'return_var_type',undef,[
+				[[],[],['return_domain'],['SCALAR'],1],
+			]],
+		],
 	},
 	'routine_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -805,13 +828,13 @@ my %NODE_TYPES = (
 			'curs_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( var_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( routine )},
-		$TPI_MCEE_NREFS => {
-			'domain' => ['var_type', 'SCALAR'],
-			'curs_view' => ['var_type', 'CURSOR'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( var_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'var_type',undef,[
+				[[],[],['domain'],['SCALAR'],1],
+				[[],[],['curs_view'],['CURSOR'],1],
+			]],
+		],
 	},
 	'routine_var' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -832,13 +855,16 @@ my %NODE_TYPES = (
 			'curs_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( var_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( routine )},
-		$TPI_MCEE_NREFS => {
-			'domain' => ['var_type', 'SCALAR'],
-			'curs_view' => ['var_type', 'CURSOR'],
-		},
+		$TPI_MA_ATTRS => [[qw( name )],[qw( var_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'var_type',undef,[
+				[[],[],['domain'],['SCALAR'],1],
+				[['init_lit_val'],[],[],['SCALAR'],0],
+				[['is_constant'],[],[],['SCALAR'],0],
+				[[],[],['curs_view'],['CURSOR'],1],
+				[['curs_for_update'],[],[],['CURSOR'],0],
+			]],
+		],
 	},
 	'routine_stmt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -862,15 +888,20 @@ my %NODE_TYPES = (
 			'catalog_link' => 'catalog_link',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( stmt_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( routine )},
-		$TPI_MCEE_ENUMS => {
-			'call_sproc' => ['stmt_type', 'SPROC'],
-		},
-		$TPI_MCEE_NREFS => {
-			'block_routine' => ['stmt_type', 'BLOCK'],
-			'call_uproc' => ['stmt_type', 'UPROC'],
-		},
+		$TPI_MA_ATTRS => [[],[qw( stmt_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'stmt_type',undef,[
+				[[],[],['block_routine'],['BLOCK'],1],
+				[[],[],['dest_arg','dest_var'],['ASSIGN'],1],
+				[[],['call_sproc'],[],['SPROC'],1],
+				[[],[],['curs_arg','curs_var'],['SPROC'],0],
+				[[],[],['view_for_dml'],['SPROC'],0],
+				[[],[],['call_uproc'],['UPROC'],1],
+			]],
+			[undef,undef,'call_uproc',[
+				[[],[],['catalog_link'],[],0],
+			]],
+		],
 	},
 	'routine_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -896,22 +927,25 @@ my %NODE_TYPES = (
 			'catalog_link' => 'catalog_link',
 		},
 		$TPI_P_NODE_ATNMS => [qw( p_expr p_stmt )],
-		$TPI_R_P_NODE_ATNM => 'p_expr',
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( expr_type )},
-		$TPI_MCR_NREFS => {map { ($_ => 1) } qw( p_stmt )},
-		$TPI_MCEE_LITERALS => {
-			'lit_val' => ['expr_type', 'LIT'],
-		},
-		$TPI_MCEE_ENUMS => {
-			'call_sfunc' => ['expr_type', 'SFUNC'],
-		},
-		$TPI_MCEE_NREFS => {
-			'domain' => ['expr_type', 'LIT', 'expr_type', 'CAST'],
-			'routine_arg' => ['expr_type', 'ARG'],
-			'routine_var' => ['expr_type', 'VAR'],
-			'sequence' => ['expr_type', 'SEQN'],
-			'call_ufunc' => ['expr_type', 'UFUNC'],
-		},
+		$TPI_MA_ATTRS => [[],[qw( expr_type )],[]],
+		$TPI_MUTEX_ATGPS => [
+			['value',[qw( lit_val )],[qw( call_sfunc )],
+				[qw( routine_arg routine_var sequence call_ufunc call_ufunc_arg )],1],
+		],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'expr_type',undef,[
+				[[],[],['domain'],['LIT','CAST'],1],
+				[['lit_val'],[],[],['LIT'],1],
+				[[],[],['routine_arg'],['ARG'],1],
+				[[],[],['routine_var'],['VAR'],1],
+				[[],[],['sequence'],['SEQN'],1],
+				[[],['call_sfunc'],[],['SFUNC'],1],
+				[[],[],['call_ufunc'],['UFUNC'],1],
+			]],
+			[undef,undef,'call_ufunc',[
+				[[],[],['catalog_link'],[],0],
+			]],
+		],
 	},
 	'command' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -927,15 +961,13 @@ my %NODE_TYPES = (
 			'application' => 'application',
 		},
 		$TPI_P_NODE_ATNMS => [qw( application )],
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( command_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application )},
+		$TPI_MA_ATTRS => [[],[qw( command_type )],[]],
 	},
 	'command_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id command catalog_link schema domain sequence table view routine user
 		)],
 		$TPI_AT_NREFS => {
-			'application' => 'application',
 			'command' => 'command',
 			'catalog_link' => 'catalog_link',
 			'schema' => 'schema',
@@ -947,7 +979,10 @@ my %NODE_TYPES = (
 			'user' => 'user',
 		},
 		$TPI_P_NODE_ATNMS => [qw( command )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( command )},
+		$TPI_MUTEX_ATGPS => [
+			['command_arg',[],[],
+				[qw( catalog_link schema domain sequence table view routine user )],1],
+		],
 	},
 	'data_storage_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -961,7 +996,10 @@ my %NODE_TYPES = (
 			'is_network_svc' => 'bool',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_TOOL_PSND,
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( product_code )},
+		$TPI_MA_ATTRS => [[qw( product_code )],[],[]],
+		$TPI_MUTEX_ATGPS => [
+			['type',[qw( is_file_based is_local_proc is_network_svc )],[],[],1],
+		],
 	},
 	'data_link_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -973,7 +1011,7 @@ my %NODE_TYPES = (
 			'is_proxy' => 'bool',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_TOOL_PSND,
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( product_code )},
+		$TPI_MA_ATTRS => [[qw( product_code )],[],[]],
 	},
 	'catalog_instance' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -991,7 +1029,7 @@ my %NODE_TYPES = (
 			'blueprint' => 'catalog',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_SITE_PSND,
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( product blueprint )},
+		$TPI_MA_ATTRS => [[],[],[qw( product blueprint )]],
 	},
 	'catalog_instance_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1005,8 +1043,7 @@ my %NODE_TYPES = (
 			'catalog' => 'catalog_instance',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( key value )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog )},
+		$TPI_MA_ATTRS => [[qw( key value )],[],[]],
 	},
 	'application_instance' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1019,7 +1056,7 @@ my %NODE_TYPES = (
 			'blueprint' => 'application',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_SITE_PSND,
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( blueprint )},
+		$TPI_MA_ATTRS => [[],[],[qw( blueprint )]],
 	},
 	'catalog_link_instance' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1039,9 +1076,11 @@ my %NODE_TYPES = (
 			'target' => 'catalog_instance',
 		},
 		$TPI_P_NODE_ATNMS => [qw( p_link catalog application )],
-		$TPI_R_P_NODE_ATNM => 'p_link',
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( product )},
-		$TPI_MCR_NREFS => {map { ($_ => 1) } qw( unrealized target )},
+		$TPI_MA_ATTRS => [[],[],[qw( product )]],
+		$TPI_MUTEX_ATGPS => [
+			['link_root_unrealized',[],[],[qw( p_link unrealized )],1],
+			['link_root_target',[],[],[qw( p_link target )],1],
+		],
 	},
 	'catalog_link_instance_opt' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1055,8 +1094,7 @@ my %NODE_TYPES = (
 			'link' => 'catalog_link_instance',
 		},
 		$TPI_P_NODE_ATNMS => [qw( link )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( key value )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( link )},
+		$TPI_MA_ATTRS => [[qw( key value )],[],[]],
 	},
 	'user' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1075,15 +1113,14 @@ my %NODE_TYPES = (
 			'default_schema' => 'schema',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( user_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog )},
-		$TPI_MCEE_LITERALS => {
-			'name' => ['user_type', 'ROOT', 'user_type', 'SCHEMA_OWNER', 'user_type', 'DATA_EDITOR'],
-			'password' => ['user_type', 'ROOT', 'user_type', 'SCHEMA_OWNER', 'user_type', 'DATA_EDITOR'],
-		},
-		$TPI_MCEE_NREFS => {
-			'match_owner' => ['user_type', 'SCHEMA_OWNER'],
-		},
+		$TPI_MA_ATTRS => [[],[qw( user_type )],[]],
+		$TPI_LOCAL_ATDPS => [
+			[undef,'user_type',undef,[
+				[[],[],['match_owner'],['SCHEMA_OWNER'],1],
+				[['name'],[],[],['ROOT','SCHEMA_OWNER','DATA_EDITOR'],1],
+				[['password'],[],[],['ROOT','SCHEMA_OWNER','DATA_EDITOR'],1],
+			]],
+		],
 	},
 	'user_role' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1094,7 +1131,7 @@ my %NODE_TYPES = (
 			'role' => 'role',
 		},
 		$TPI_P_NODE_ATNMS => [qw( user )],
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( user role )},
+		$TPI_MA_ATTRS => [[],[],[qw( role )]],
 	},
 	'sql_fragment' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1112,6 +1149,9 @@ my %NODE_TYPES = (
 			'product' => 'data_storage_product',
 		},
 		$TPI_P_PSEUDONODE => $SQLSM_L2_CIRC_PSND,
+		$TPI_MUTEX_ATGPS => [
+			['is_where',[qw( is_inside is_before is_after )],[],[],0],
+		],
 	},
 );
 
@@ -1209,25 +1249,25 @@ sub node_types_with_pseudonode_parents {
 sub mandatory_node_type_literal_attribute_names {
 	my ($self, $type, $attr) = @_;
 	($type and exists( $NODE_TYPES{$type} )) or return( undef );
-	exists( $NODE_TYPES{$type}->{$TPI_MA_LITERALS} ) or return( undef );
-	$attr and return( $NODE_TYPES{$type}->{$TPI_MA_LITERALS}->{$attr} );
-	return( {%{$NODE_TYPES{$type}->{$TPI_MA_LITERALS}}} );
+	exists( $NODE_TYPES{$type}->{$TPI_MA_ATTRS} ) or return( undef );
+	$attr and return( grep { $_ eq $attr } @{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[0]} );
+	return( [@{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[0]}] );
 }
 
 sub mandatory_node_type_enumerated_attribute_names {
 	my ($self, $type, $attr) = @_;
 	($type and exists( $NODE_TYPES{$type} )) or return( undef );
-	exists( $NODE_TYPES{$type}->{$TPI_MA_ENUMS} ) or return( undef );
-	$attr and return( $NODE_TYPES{$type}->{$TPI_MA_ENUMS}->{$attr} );
-	return( {%{$NODE_TYPES{$type}->{$TPI_MA_ENUMS}}} );
+	exists( $NODE_TYPES{$type}->{$TPI_MA_ATTRS} ) or return( undef );
+	$attr and return( grep { $_ eq $attr } @{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[1]} );
+	return( [@{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[1]}] );
 }
 
 sub mandatory_node_type_node_ref_attribute_names {
 	my ($self, $type, $attr) = @_;
 	($type and exists( $NODE_TYPES{$type} )) or return( undef );
-	exists( $NODE_TYPES{$type}->{$TPI_MA_NREFS} ) or return( undef );
-	$attr and return( $NODE_TYPES{$type}->{$TPI_MA_NREFS}->{$attr} );
-	return( {%{$NODE_TYPES{$type}->{$TPI_MA_NREFS}}} );
+	exists( $NODE_TYPES{$type}->{$TPI_MA_ATTRS} ) or return( undef );
+	$attr and return( grep { $_ eq $attr } @{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[2]} );
+	return( [@{$NODE_TYPES{$type}->{$TPI_MA_ATTRS}->[2]}] );
 }
 
 ######################################################################
@@ -1399,13 +1439,37 @@ sub test_deferrable_constraints {
 	if( $container->{$CPROP_DEF_CON_TESTED} ) {
 		return( 1 );
 	}
-	foreach my $nodes_by_type (values %{$container->{$CPROP_ALL_NODES}}) {
-		foreach my $node (values %{$nodes_by_type}) {
-			$node->{$NPROP_LINKS_RECIP} or next; # Skip Nodes not in "Well Known" status.
-			$node->test_deferrable_constraints();
+	# Test nodes in the same order that they appear in the Node tree.
+	foreach my $pseudonode (@L2_PSEUDONODE_LIST) {
+		foreach my $child_node (@{$container->{$CPROP_PSEUDONODES}->{$pseudonode}}) {
+			$container->_test_deferrable_constraints( $child_node );
 		}
 	}
 	$container->{$CPROP_DEF_CON_TESTED} = 1;
+}
+
+sub _test_deferrable_constraints {
+	my ($container, $node) = @_;
+	$node->test_deferrable_constraints();
+	my %children_were_output = ();
+	foreach my $child_node (@{$node->{$NPROP_CHILD_NODES}}) {
+		if( my $child_p_node_atnm = $child_node->{$NPROP_P_NODE_ATNM} ) {
+			if( my $child_main_parent = $child_node->{$NPROP_AT_NREFS}->{$child_p_node_atnm} ) {
+				if( $child_main_parent eq $node ) {
+					# Only nav to child if we are its primary parent, not simply any parent.
+					unless( $children_were_output{$child_node} ) {
+						# Only nav to child once; a child may link to same parent multiple times.
+						$container->_test_deferrable_constraints( $child_node );
+						$children_were_output{$child_node} = 1;
+					}
+				}
+			}
+		} else { # !$child_node->{$NPROP_P_NODE_ATNM}
+			# Make sure to report error condition that primary parent attribute name not set, 
+			# assuming this Node can't alternately have a pseudonode primary parent.
+			$child_node->test_deferrable_constraints();
+		}
+	}
 }
 
 ######################################################################
@@ -1953,7 +2017,7 @@ sub get_parent_node_attribute_name {
 sub get_parent_node {
 	my ($node) = @_;
 	if( $node->{$NPROP_P_NODE_ATNM} and $node->{$NPROP_CONTAINER} ) {
-		# Note that the associated AT_NODES property may not be valued right now.
+		# Note that the associated AT_NREFS property may not be valued right now.
 		# This code may be changed later to return a Node id when not in a container.
 		return( $node->{$NPROP_AT_NREFS}->{$node->{$NPROP_P_NODE_ATNM}} );
 	}
@@ -2073,7 +2137,7 @@ sub put_in_container {
 		my $at_node_type = $tpi_at_nodes->{$at_nodes_atnm};
 		my $at_nodes_ref = $rh_cnl_bt->{$at_node_type}->{$at_nodes_nid};
 		unless( $at_nodes_ref ) {
-			$node->_throw_error_message( 'SSM_N_PI_CONT_NONEX_AT_NODE', 
+			$node->_throw_error_message( 'SSM_N_PI_CONT_NONEX_AT_NREF', 
 				{ 'ATNM' => $at_nodes_atnm, 'TYPE' => $at_node_type, 'ID' => $at_nodes_nid } );
 		}
 		$at_nodes_refs{$at_nodes_atnm} = $at_nodes_ref;
@@ -2285,150 +2349,217 @@ sub test_deferrable_constraints {
 	my $node_id = $node->{$NPROP_NODE_ID};
 	my $type_info = $NODE_TYPES{$node_type};
 
-	# First test 'id' attribute that is mandatory under all conditions.
+	# 1: Now test constraints associated with Node-type details given in each 
+	# "Attribute List" section of Language.pod.
 
-	unless( defined( $node->{$NPROP_NODE_ID} ) ) {
-		$node->_throw_error_message( 'SSM_N_TEDC_NID_VAL_NO_SET', 
-			{ 'NAME' => $ATTR_ID, 'HOSTTYPE' => $node_type } );
+	# 1.1: Assert that the NODE_ID attribute is set.
+	unless( defined( $node_id ) ) {
+		# This can only possibly fail at deferred-constraint assertion time with "Alone" Nodes; 
+		# it is always-enforced for "At Home" and "Well Known" Nodes.
+		$node->_throw_error_message( 'SSM_N_TEDC_NID_VAL_NO_SET', { 'HOSTTYPE' => $node_type } );
 	}
 
-	# Next test non-'id' attributes that are mandatory under all conditions.
+	# 1.2: Assert that a Node which can have a Node primary-parent does in fact have one.
+	if( !$type_info->{$TPI_P_PSEUDONODE} and !$node->{$NPROP_P_NODE_ATNM} ) {
+		$node->_throw_error_message( 'SSM_N_TEDC_P_NODE_ATNM_NOT_SET', 
+			{ 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+	}
 
-	if( my $mand_attrs = $type_info->{$TPI_MA_LITERALS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
+	# 1.3: Assert that exactly one primary parent ("PP") Node attribute is set.
+	if( my $p_node_atnms = $NODE_TYPES{$node_type}->{$TPI_P_NODE_ATNMS} ) {
+		my @valued_candidates = ();
+		foreach my $attr_name (@{$p_node_atnms}) {
+			if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
+				push( @valued_candidates, $attr_name );
+			}
+		}
+		if( scalar( @valued_candidates ) > 1 ) {
+			$node->_throw_error_message( 'SSM_N_TEDC_PP_TOO_MANY_SET', 
+				{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+				'NUMVALS' => scalar( @valued_candidates ), 'ATNMS' => "@valued_candidates" } );
+		}
+		if( scalar( @valued_candidates ) == 0 ) {
+			my @possible_candidates = @{$p_node_atnms};
+			$node->_throw_error_message( 'SSM_N_TEDC_PP_ZERO_SET', 
+				{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNMS' => "@possible_candidates" } );
+		}
+	}
+
+	# 1.4: Assert that any always-mandatory ("MA") attributes are set.
+	if( my $mand_attrs = $type_info->{$TPI_MA_ATTRS} ) {
+		my ($lits, $enums, $nrefs) = @{$mand_attrs};
+		foreach my $attr_name (@{$lits}) {
 			unless( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
 				$node->_throw_error_message( 'SSM_N_TEDC_MA_LIT_VAL_NO_SET', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
 			}
 		}
-	}
-	if( my $mand_attrs = $type_info->{$TPI_MA_ENUMS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
+		foreach my $attr_name (@{$enums}) {
 			unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
 				$node->_throw_error_message( 'SSM_N_TEDC_MA_ENUM_VAL_NO_SET', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
 			}
 		}
-	}
-	if( my $mand_attrs = $type_info->{$TPI_MA_NREFS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
+		foreach my $attr_name (@{$nrefs}) {
 			unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
 				$node->_throw_error_message( 'SSM_N_TEDC_MA_NREF_VAL_NO_SET', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'ATNM' => $attr_name } );
 			}
 		}
 	}
 
-	# Next test that exactly one primary parent Node attribute is set.
-	if( my $p_node_atnms = $NODE_TYPES{$node_type}->{$TPI_P_NODE_ATNMS} ) {
-		if( scalar( @{$p_node_atnms} ) > 1 ) { # assume 'MA' took care of this when = 1
-			my $valued_candidates = 0;
-			foreach my $attr_name (@{$p_node_atnms}) {
+	# 2: Now test constraints associated with Node-type details given in each 
+	# "Exclusive Attribute Groups List" section of Language.pod.
+
+	if( my $mutex_atgps = $NODE_TYPES{$node_type}->{$TPI_MUTEX_ATGPS} ) {
+		foreach my $mutex_atgp (@{$mutex_atgps}) {
+			my ($mutex_name, $lits, $enums, $nrefs, $is_mandatory) = @{$mutex_atgp};
+			my @valued_candidates = ();
+			foreach my $attr_name (@{$lits}) {
+				if( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
+					push( @valued_candidates, $attr_name );
+				}
+			}
+			foreach my $attr_name (@{$enums}) {
+				if( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
+					push( @valued_candidates, $attr_name );
+				}
+			}
+			foreach my $attr_name (@{$nrefs}) {
 				if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-					$valued_candidates ++;
+					push( @valued_candidates, $attr_name );
 				}
 			}
-			if( $valued_candidates != 1 ) {
-				$node->_throw_error_message( 'SSM_N_TEDC_NO_SINGLE_PP_SET', 
-					{ 'NAMES' => "@{$p_node_atnms}", 'NUMVALS' => $valued_candidates, 
-					'HOSTTYPE' => $node_type, 'ID' => $node_id } );
+			if( scalar( @valued_candidates ) > 1 ) {
+				$node->_throw_error_message( 'SSM_N_TEDC_MUTEX_TOO_MANY_SET', 
+					{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+					'NUMVALS' => scalar( @valued_candidates ), 
+					'ATNMS' => "@valued_candidates", 'MUTEX' => $mutex_name } );
+			}
+			if( scalar( @valued_candidates ) == 0 ) {
+				if( $is_mandatory ) {
+					my @possible_candidates = (@{$lits}, @{$enums}, @{$nrefs});
+					$node->_throw_error_message( 'SSM_N_TEDC_MUTEX_ZERO_SET', 
+						{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+						'ATNMS' => "@possible_candidates", 'MUTEX' => $mutex_name } );
+				}
 			}
 		}
 	}
 
-	# Next prepare to test attributes that are only mandatory under some circumstances.
+	# 3: Now test constraints associated with Node-type details given in each 
+	# "Local Attribute Dependencies List" section of Language.pod.
 
-	my $r_p_node_atnm = $type_info->{$TPI_R_P_NODE_ATNM};
-
-	# Next test attributes which are conditionally mandatory when the current Node type is 
-	# directly recursive and the current Node is the root of a tree (could be of one element).
-	# Each attr must be set when we are the tree root, must be null when not the tree root.
-
-	if( $r_p_node_atnm ) {
-		my $p_node_at_is_set = $node->{$NPROP_AT_NREFS}->{$r_p_node_atnm} ? 1 : 0;
-		# Note, there currently are no $TPI_MCR_LITERALS.
-		if( my $mand_attrs = $type_info->{$TPI_MCR_ENUMS} ) {
-			foreach my $attr_name (keys %{$mand_attrs}) {
-				if( $p_node_at_is_set ) {
+	if( my $local_atdps_list = $NODE_TYPES{$node_type}->{$TPI_LOCAL_ATDPS} ) {
+		foreach my $local_atdps_item (@{$local_atdps_list}) {
+			my ($dep_on_lit_nm, $dep_on_enum_nm, $dep_on_nref_nm, $dependencies) = @{$local_atdps_item};
+			foreach my $dependency (@{$dependencies}) {
+				my ($lits, $enums, $nrefs, $dep_on_enum_vals, $is_mandatory) = @{$dependency};
+				my @valued_dependents = ();
+				foreach my $attr_name (@{$lits}) {
+					if( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
+						push( @valued_dependents, $attr_name );
+					}
+				}
+				foreach my $attr_name (@{$enums}) {
 					if( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCR_ENUM_VAL_YES_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
-							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
-					}
-				} else { # if !$p_node_at_is_set
-					unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCR_ENUM_VAL_NO_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
-							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
+						push( @valued_dependents, $attr_name );
 					}
 				}
-			}
-		}
-		if( my $mand_attrs = $type_info->{$TPI_MCR_NREFS} ) {
-			foreach my $attr_name (keys %{$mand_attrs}) {
-				if( $p_node_at_is_set ) {
+				foreach my $attr_name (@{$nrefs}) {
 					if( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCR_NREF_VAL_YES_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
+						push( @valued_dependents, $attr_name );
 					}
-				} else { # if !$p_node_at_is_set
-					unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCR_NREF_VAL_NO_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 
-							'ID' => $node_id, 'CHECKNM' => $r_p_node_atnm } );
+				}
+				if( $dep_on_lit_nm ) {
+					my $dep_on_attr_val = $node->{$NPROP_AT_LITERALS}->{$dep_on_lit_nm};
+					if( !defined( $dep_on_attr_val ) ) {
+						# The dependency is undef/null, so all dependents must be undef/null.
+						if( scalar( @valued_dependents ) > 0 ) {
+							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_lit_nm,
+								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+						}
+					} else {
+						# The dependency is valued, so a dependent may be set.
+						# SHORT CUT: We know that with all of our existing config data, 
+						# @valued_dependents has only 0..1 elements, and that none are mandatory.
+						# So no more tests to do.  We will put code here later if either fact changes.
 					}
+					# If we get here, the tests have passed concerning this $dependency.
+					next;
+				}
+				if( $dep_on_enum_nm ) {
+					my $dep_on_attr_val = $node->{$NPROP_AT_ENUMS}->{$dep_on_enum_nm};
+					if( !defined( $dep_on_attr_val ) ) {
+						# The dependency is undef/null, so all dependents must be undef/null.
+						if( scalar( @valued_dependents ) > 0 ) {
+							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
+								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+						}
+						# If we get here, the tests have passed concerning this $dependency.
+					} elsif( !scalar( grep { $_ eq $dep_on_attr_val } @{$dep_on_enum_vals} ) ) {
+						# The dependency has the wrong value for these dependents; the latter must be undef/null.
+						if( scalar( @valued_dependents ) > 0 ) {
+							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_HAS_WRONG_VAL', 
+								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
+								'DEP_ON_VAL' => $dep_on_attr_val, 
+								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+						}
+						# If we get here, the tests have passed concerning this $dependency.
+					} else {
+						# The dependency has the right value for these dependents; one of them may be set.
+						if( scalar( @valued_dependents ) > 1 ) {
+							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_TOO_MANY_SET', 
+								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
+								'DEP_ON_VAL' => $dep_on_attr_val, 
+								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+						}
+						if( scalar( @valued_dependents ) == 0 ) {
+							if( $is_mandatory ) {
+								my @possible_candidates = (@{$lits}, @{$enums}, @{$nrefs});
+								$node->_throw_error_message( 'SSM_N_TEDC_LATDP_ZERO_SET', 
+									{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_enum_nm,
+								'DEP_ON_VAL' => $dep_on_attr_val, 'ATNMS' => "@possible_candidates" } );
+							}
+						}
+						# If we get here, the tests have passed concerning this $dependency.
+					}
+					next;
+				}
+				if( $dep_on_nref_nm ) {
+					my $dep_on_attr_val = $node->{$NPROP_AT_NREFS}->{$dep_on_nref_nm};
+					if( !defined( $dep_on_attr_val ) ) {
+						# The dependency is undef/null, so all dependents must be undef/null.
+						if( scalar( @valued_dependents ) > 0 ) {
+							$node->_throw_error_message( 'SSM_N_TEDC_LATDP_DEP_ON_IS_NULL', 
+								{ 'HOSTTYPE' => $node_type, 'ID' => $node_id, 'DEP_ON' => $dep_on_nref_nm,
+								'NUMVALS' => scalar( @valued_dependents ), 'ATNMS' => "@valued_dependents" } );
+						}
+					} else {
+						# The dependency is valued, so a dependent may be set.
+						# SHORT CUT: We know that with all of our existing config data, 
+						# @valued_dependents has only 0..1 elements, and that none are mandatory.
+						# So no more tests to do.  We will put code here later if either fact changes.
+					}
+					# If we get here, the tests have passed concerning this $dependency.
+					next;
 				}
 			}
 		}
 	}
 
-	# Next test attributes that are only mandatory when another enumerated 
-	# attribute in the same Node has a specific value.
+	# This is the end of the tests that can be performed on "Alone" Nodes.
 
-	my $e_ats = $node->{$NPROP_AT_ENUMS};
-	if( my $mand_attrs = $type_info->{$TPI_MCEE_LITERALS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
-			unless( defined( $node->{$NPROP_AT_LITERALS}->{$attr_name} ) ) {
-				my @equality_tests = @{$mand_attrs->{$attr_name}};
-				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
-					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_LIT_VAL_NO_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
-					}
-				}
-			}
-		}
+	my $container = $node->{$NPROP_CONTAINER};
+	unless( $container ) {
+		return( 1 ); # "Alone" Nodes quit now.
 	}
-	if( my $mand_attrs = $type_info->{$TPI_MCEE_ENUMS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
-			unless( defined( $node->{$NPROP_AT_ENUMS}->{$attr_name} ) ) {
-				my @equality_tests = @{$mand_attrs->{$attr_name}};
-				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
-					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_ENUM_VAL_NO_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
-					}
-				}
-			}
-		}
-	}
-	if( my $mand_attrs = $type_info->{$TPI_MCEE_NREFS} ) {
-		foreach my $attr_name (keys %{$mand_attrs}) {
-			unless( defined( $node->{$NPROP_AT_NREFS}->{$attr_name} ) ) {
-				my @equality_tests = @{$mand_attrs->{$attr_name}};
-				while( my ($attr_to_check, $val_to_check) = splice( @equality_tests, 0, 2 ) ) {
-					if( $e_ats->{$attr_to_check} and $e_ats->{$attr_to_check} eq $val_to_check ) {
-						$node->_throw_error_message( 'SSM_N_TEDC_MCEE_NREF_VAL_NO_SET', 
-							{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
-					}
-				}
-			}
-		}
-	}
+
+	# If we get here, Node is "At Home" or "Well Known".
+	# However, only "Well Known" Nodes would get invoked by Container.test_deferrable_constraints(); 
+	# "At Home" Nodes only get this far when Node.test_deferrable_constraints() invoked externally.
 
 	# TODO: Tests that examine a Node's correctness based on attributes of related Nodes.
 }
@@ -3601,13 +3732,13 @@ of the named node attribute, if it has one".
 
 =head2 clear_parent_node_attribute_name()
 
-This "setter" method will clear this Node's 'parent node attribute name' 
-property, if it has one.  The actual node attribute being referred to 
-is not affected.
+This "setter" method will clear this Node's 'primary pparent node attribute
+name' property, if it has one.  The actual node attribute being referred to is
+not affected.
 
 =head2 set_parent_node_attribute_name( ATTR_NAME )
 
-This "setter" method will set or replace this Node's 'parent node attribute
+This "setter" method will set or replace this Node's 'primary parent node attribute
 name' property, giving it the new value specified in ATTR_NAME.  No actual node
 attribute is affected.  Note that only a subset (usually one) of a Node's node
 attributes may be named as the holder of its primary parent.
@@ -3844,21 +3975,24 @@ argument is given, it just returns the pseudo-node for that Node Type.
 
 =head2 mandatory_node_type_literal_attribute_names( NODE_TYPE[, ATTR_NAME] )
 
-This function by default returns a list of the mandatory literal attributes of
-the Node Type specified in the NODE_TYPE argument; if the optional ATR_NAME
-argument is given, it just returns true if that attribute is mandatory.
+This function by default returns an Array ref which lists the always-mandatory
+literal attributes of the Node Type specified in the NODE_TYPE argument; if the
+optional ATR_NAME argument is given, it just returns true if that attribute is
+always-mandatory.
 
 =head2 mandatory_node_type_enumerated_attribute_names( NODE_TYPE[, ATTR_NAME] )
 
-This function by default returns a list of the mandatory enumerated attributes
-of the Node Type specified in the NODE_TYPE argument; if the optional ATR_NAME
-argument is given, it just returns true if that attribute is mandatory.
+This function by default returns an Array ref which lists the always-mandatory
+enumerated attributes of the Node Type specified in the NODE_TYPE argument; if
+the optional ATR_NAME argument is given, it just returns true if that attribute
+is always-mandatory.
 
 =head2 mandatory_node_type_node_ref_attribute_names( NODE_TYPE[, ATTR_NAME] )
 
-This function by default returns a list of the mandatory node attributes of the
-Node Type specified in the NODE_TYPE argument; if the optional ATR_NAME
-argument is given, it just returns true if that attribute is mandatory.
+This function by default returns an Array ref which lists the always-mandatory
+node ref attributes of the Node Type specified in the NODE_TYPE argument; if
+the optional ATR_NAME argument is given, it just returns true if that attribute
+is always-mandatory.
 
 =head1 BUGS
 
