@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.20';
+$VERSION = '0.21';
 
 use Locale::KeyedText 0.03;
 
@@ -155,7 +155,7 @@ my %ENUMERATED_TYPES = (
 		MATCH SINGLE MULTIPLE COMPOUND SUBQUERY RECURSIVE
 	) },
 	'compound_operator' => { map { ($_ => 1) } qw(
-		DISTINCT ALL UNION INTERSECT EXCLUSIVE EXCEPT
+		UNION DIFFERENCE INTERSECTION EXCLUSION
 	) },
 	'join_operator' => { map { ($_ => 1) } qw(
 		CROSS INNER LEFT RIGHT FULL
@@ -164,7 +164,7 @@ my %ENUMERATED_TYPES = (
 		RESULT INTO SET FROM WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
 	) },
 	'basic_expr_type' => { map { ($_ => 1) } qw(
-		LIT COL MCOL VARG ARG VAR CAST SEQN CVIEW SFUNC UFUNC
+		LIT COL MCOL VARG ARG VAR CAST SEQN CVIEW SFUNC UFUNC LIST
 	) },
 	'standard_func' => { map { ($_ => 1) } qw(
 		NOT AND OR XOR
@@ -172,12 +172,13 @@ my %ENUMERATED_TYPES = (
 		ADD SUB MUL DIV DIVI MOD ROUND ABS POWER LOG
 		SCONCAT SLENGTH SINDEX SUBSTR SREPEAT STRIM SPAD SPADL LC UC
 		COUNT MIN MAX SUM AVG CONCAT EVERY ANY SOME EXISTS
+		GB_SETS GB_RLUP GB_CUBE
 	) },
 	'basic_var_type' => { map { ($_ => 1) } qw(
 		SCALAR RECORD ARRAY CURSOR
 	) },
 	'routine_type' => { map { ($_ => 1) } qw(
-		ANONYMOUS PACKAGE TRIGGER PROCEDURE FUNCTION LOOP CONDITION
+		ANONYMOUS PACKAGE TRIGGER PROCEDURE FUNCTION BLOCK
 	) },
 	'basic_trigger_event' => { map { ($_ => 1) } qw(
 		BEFR_INS AFTR_INS INST_INS 
@@ -185,17 +186,16 @@ my %ENUMERATED_TYPES = (
 		BEFR_DEL AFTR_DEL INST_DEL
 	) },
 	'basic_stmt_type' => { map { ($_ => 1) } qw(
-		ASSIGN SPROC UPROC LOGIC
+		BLOCK ASSIGN RETURN SPROC UPROC
 	) },
 	'standard_proc' => { map { ($_ => 1) } qw(
-		RETURN 
 		CURSOR_OPEN CURSOR_CLOSE CURSOR_FETCH SELECT_INTO
 		INSERT UPDATE DELETE 
 		COMMIT ROLLBACK
 		LOCK UNLOCK 
-		ROUTINE 
 		PLAIN THROW TRY CATCH IF ELSEIF ELSE SWITCH CASE OTHERWISE FOREACH 
 		FOR WHILE UNTIL MAP GREP REGEXP 
+		LOOP CONDITION LOGIC 
 	) },
 	'user_type' => { map { ($_ => 1) } qw(
 		ROOT SCHEMA_OWNER DATA_EDITOR ANONYMOUS
@@ -522,16 +522,17 @@ my %NODE_TYPES = (
 	'view' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id view_type schema name application routine p_view 
-			match_all_cols c_merge_type may_write 
+			match_all_cols compound_op distinct_rows may_write 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
 			'match_all_cols' => 'bool',
+			'distinct_rows' => 'bool',
 			'may_write' => 'bool',
 		},
 		$TPI_AT_ENUMS => {
 			'view_type' => 'view_type',
-			'c_merge_type' => 'compound_operator',
+			'compound_op' => 'compound_operator',
 		},
 		$TPI_AT_NREFS => {
 			'schema' => 'schema',
@@ -544,7 +545,7 @@ my %NODE_TYPES = (
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( view_type )},
 		$TPI_MCEE_ENUMS => {
-			'c_merge_type' => ['view_type', 'COMPOUND'],
+			'compound_op' => ['view_type', 'COMPOUND'],
 		},
 	},
 	'view_arg' => {
@@ -739,11 +740,11 @@ my %NODE_TYPES = (
 	'routine' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id routine_type schema application p_routine table view 
-			name return_var_type return_domain trigger_event trigger_per_row
+			name return_var_type return_domain trigger_event trigger_per_stmt
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
-			'trigger_per_row' => 'bool',
+			'trigger_per_stmt' => 'bool',
 		},
 		$TPI_AT_ENUMS => {
 			'routine_type' => 'routine_type',
@@ -763,7 +764,7 @@ my %NODE_TYPES = (
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( routine_type )},
 		$TPI_MCEE_LITERALS => {
-			'trigger_per_row' => ['routine_type', 'TRIGGER'],
+			'trigger_per_stmt' => ['routine_type', 'TRIGGER'],
 		},
 		$TPI_MCEE_ENUMS => {
 			'return_var_type' => ['routine_type', 'FUNCTION'],
@@ -826,9 +827,9 @@ my %NODE_TYPES = (
 	},
 	'routine_stmt' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine stmt_type dest_arg dest_var 
+			id routine stmt_type block_routine dest_arg dest_var 
 			call_sproc curs_arg curs_var view_for_dml 
-			call_uproc catalog_link c_routine 
+			call_uproc catalog_link 
 		)],
 		$TPI_AT_ENUMS => {
 			'stmt_type' => 'basic_stmt_type',
@@ -836,6 +837,7 @@ my %NODE_TYPES = (
 		},
 		$TPI_AT_NREFS => {
 			'routine' => 'routine',
+			'block_routine' => 'routine',
 			'dest_arg' => 'routine_arg',
 			'dest_var' => 'routine_var',
 			'curs_arg' => 'routine_arg',
@@ -843,7 +845,6 @@ my %NODE_TYPES = (
 			'view_for_dml' => 'view',
 			'call_uproc' => 'routine',
 			'catalog_link' => 'catalog_link',
-			'c_routine' => 'routine',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( stmt_type )},
@@ -852,6 +853,7 @@ my %NODE_TYPES = (
 			'call_sproc' => ['stmt_type', 'SPROC'],
 		},
 		$TPI_MCEE_NREFS => {
+			'block_routine' => ['stmt_type', 'BLOCK'],
 			'call_uproc' => ['stmt_type', 'UPROC'],
 		},
 	},
@@ -2494,7 +2496,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					<routine_stmt id="5" routine="1" stmt_type="SPROC" call_sproc="CURSOR_OPEN">
 						<routine_expr id="6" expr_type="VAR" p_stmt="5" routine_var="4" />
 					</routine_stmt>
-					<routine_stmt id="7" routine="1" stmt_type="SPROC" call_sproc="RETURN">
+					<routine_stmt id="7" routine="1" stmt_type="RETURN">
 						<routine_expr id="8" expr_type="VAR" p_stmt="7" routine_var="4" />
 					</routine_stmt>
 				</routine>

@@ -174,8 +174,7 @@ sub create_and_populate_model {
 	$rte_fet_open_c_a1->set_enumerated_attribute( 'expr_type', 'VAR' );
 	$rte_fet_open_c_a1->set_node_ref_attribute( 'routine_var', $rtv_fet_cursor );
 	my $rts_fet_return = make_a_child_node( 'routine_stmt', 7, $rt_fetchall, 'routine' );
-	$rts_fet_return->set_enumerated_attribute( 'stmt_type', 'SPROC' );
-	$rts_fet_return->set_enumerated_attribute( 'call_sproc', 'RETURN' );
+	$rts_fet_return->set_enumerated_attribute( 'stmt_type', 'RETURN' );
 	my $rte_fet_return_a1 = make_a_child_node( 'routine_expr', 8, $rts_fet_return, 'p_stmt' );
 	$rte_fet_return_a1->set_enumerated_attribute( 'expr_type', 'VAR' );
 	$rte_fet_return_a1->set_node_ref_attribute( 'routine_var', $rtv_fet_cursor );
@@ -492,7 +491,7 @@ sub expected_model_xml_output {
 				<routine_stmt id="5" routine="1" stmt_type="SPROC" call_sproc="CURSOR_OPEN">
 					<routine_expr id="6" expr_type="VAR" p_stmt="5" routine_var="4" />
 				</routine_stmt>
-				<routine_stmt id="7" routine="1" stmt_type="SPROC" call_sproc="RETURN">
+				<routine_stmt id="7" routine="1" stmt_type="RETURN">
 					<routine_expr id="8" expr_type="VAR" p_stmt="7" routine_var="4" />
 				</routine_stmt>
 			</routine>
@@ -600,7 +599,7 @@ sub test_circular_ref_prevention {
 	my $vw1 = make_a_child_node( 'view', 1, $schema, 'schema' );
 	$vw1->set_enumerated_attribute( 'view_type', 'COMPOUND' );
 	$vw1->set_literal_attribute( 'name', 'foo' );
-	$vw1->set_enumerated_attribute( 'c_merge_type', 'UNION' );
+	$vw1->set_enumerated_attribute( 'compound_op', 'UNION' );
 
 	my $vw2 = make_a_child_node( 'view', 2, $vw1, 'p_view' );
 	$vw2->set_enumerated_attribute( 'view_type', 'SINGLE' );

@@ -1,3 +1,34 @@
+2004-06-21   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.34.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.21).  Split the single
+	'view' attribute 'c_merge_type' into 'compound_op' and 'distinct_rows'; the
+	latter can be used with any view type.  Changed the values list of the
+	compound_operator enumerated type from [DISTINCT, ALL, UNION, INTERSECT,
+	EXCLUSIVE, EXCEPT] to [UNION, DIFFERENCE, INTERSECTION, EXCLUSION].
+
+	* Added support for OLAP extensions, whose details are stored in
+	'view_expr' Nodes associated with a group-by clause.  Added these 3
+	'standard_func' enumerated values: [GB_SETS, GB_RLUP, GB_CUBE].  Added
+	'LIST' to the 'basic_expr_type' enumerated list.
+
+	* Added "routine_type" enumerated value "BLOCK" and removed the two values
+	[LOOP, CONDITION].  Added "basic_stmt_type" enumerated values [BLOCK,
+	RETURN] and removed "LOGIC" (plus documentation re DECLARE, SET).  Removed
+	"standard_proc" enumerated values "RETURN" (redundant with a basic type),
+	and "ROUTINE" (likewise redundant); added 3 values [LOOP, CONDITION,
+	LOGIC]; split list in two, as the second part isn't rigorously defined yet.  
+	Renamed "routine_stmt" Node attribute 'c_routine' to 'block_routine'.
+
+	* Renamed 'routine' boolean attr 'trigger_per_row' to 'trigger_per_stmt';
+	its meaning is now reversed, and 'per row' is now the default action.
+
+	* Small updates to t_SQL_SyntaxModel.pm that keep the tests compatible with 
+	the aforementioned changes, and to SQL::SyntaxModel's SYNOPSIS.
+
+	* A few other small documentation fixes or updates.
+
 2004-05-20   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.33.

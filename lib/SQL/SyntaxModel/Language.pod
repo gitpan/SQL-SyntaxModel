@@ -68,9 +68,6 @@ is meant to say what 'grammar' for SQL::SyntaxModel's 'language' is, or what
 The type of information this document would provide is functionally similar to
 the SQL design documents, or vendor-specific ones.
 
-I<CAVEAT: SOME PARTS OF THIS DOCUMENT, PARTICULARLY THE PARTS RELATED TO
-ROUTINES AND COMMANDS, STILL NEED SOME MAJOR EDITING BEFORE THEY ARE "DONE".>
-
 =head1 FEATURE SCOPE AND STANDARDS COMPLIANCE
 
 SQL::SyntaxModel mainly follows its own path regarding its language structure;
@@ -162,7 +159,7 @@ this document goes into more detail on them):
 	- anonymous subqueries in any part of main query
 	- named subqueries ("with") likewise
 	- recursive queries
-	- OLAP extensions (related to group-by)
+	- OLAP extensions, rollup, cube, grouping sets (related to group-by)
 	- updateable views; inserts, updates, deletes through any view (if key data not lost)
 	- "insert as select"
 	- multiple users, roles, privileges
@@ -369,6 +366,7 @@ another of the same type (eg: a sub-query or sub-routine).
 		</view_join>
 		<view_hierarchy c="1" />
 		<view_expr c="M" r="Y" />
+		<routine c="M" r="Y" />
 	</view>
 
 	<routine c="M" r="Y">
@@ -671,14 +669,16 @@ These are the standard ways that rows returned from multiple compatible
 views/queries can be merged into a single result set, where all of the input
 rows have the same set of columns as the the output rows, and each single
 output row matches a distinct input row.  A union is the most common such
-operation.
+operation.  Each of these compound operators is by definition ambiguous as to
+whether the output set includes all allowed input rows or just distinct ones;
+you must keep an associated "set quantifier" value to specify ALL or DISTINCT.
 
-	DISTINCT  - all distinct rows from a single input set, like a "select distinct ..."
-	ALL       - all input rows are returned, like a "union all" (the default)
-	UNION     - all distinct rows that are each in at least one input set
-	INTERSECT - all distinct rows that are each in every input set
-	EXCLUSIVE - all distinct rows that are each in exactly one input set (exclusive or)
-	EXCEPT    - all distinct rows from one input set that are not in the others
+	UNION        - all rows that are each in at least one input set (logical 'or' or 'plus')
+	DIFFERENCE   - all rows from one input set that are not in the others ('except','minus')
+	INTERSECTION - all rows that are each in every input set (logical 'and' or 'multiply')
+	EXCLUSION    - all rows that are each in exactly one input set (logical 'xor')
+
+	The above terms are generic set logic nouns, SQL differs in places.
 
 =head2 join_operator
 
@@ -742,8 +742,9 @@ variables or columns).
 	CAST  - cast the single child expression into a different data-type specified by a domain node
 	SEQN  - use "next" value from a named user defined sequence generator (schema object)
 	CVIEW - use result of a call to a view, such as a subquery or a cursor
-	SFUNC - use result of a call to a standard built-in function; one of standard_func
+	SFUNC - use result of a call to a standard built-in function (or directive); one of standard_func
 	UFUNC - use result of a call to a user defined stored function (routine)
+	LIST  - this expr is a generic list or explicit grouping of sub-exprs (comma-delim, paren-bound)
 
 =head2 standard_func
 
@@ -797,6 +798,9 @@ function (a grouping func, like 'count').
 	ANY     - aggregate - is true when at least one rec value in one col is true
 	SOME    - aggregate - is true when some rec values are true
 	EXISTS  - aggregate - is true when if there are > 0 rows
+	GB_SETS - olap, use in group-by - produces GROUPING SETS ( sub-exprs )
+	GB_RLUP - olap, use in group-by - produces ROLLUP ( sub-exprs )
+	GB_CUBE - olap, use in group-by - produces CUBE ( sub-exprs )
 
 	Note that the function list is incomplete and will grow over time.  It does not currently 
 	mention functions for working with view/cursor subqueries, such as "in" (field in subquery), 
@@ -827,7 +831,7 @@ These are the basic types that a routine can be, since SQL::SyntaxModel
 them: stored procedures and functions, triggers, and packages containing stored
 procedures and functions; all of the previous can also have nested stored
 procedures and functions; all of the previous can have nested un-named routines
-as well.  
+as well, called BLOCK.  
 
 All routine types (except packages?) can incorporate a series of statements plus
 conditionals or iterators, and all kinds can declare or use local variables,
@@ -839,12 +843,11 @@ take.  Only some routine types, functions mainly, can return a value.  Only some
 routine types have names.
 
 	ANONYMOUS - an anonymous/un-named routine declared in an application context, not persistant
-	PACKAGE   - an Oracle package; a namespace for related funcs and procs
-	TRIGGER   - a trigger on a table
-	PROCEDURE - a named stored procedure, plain or nested or in package
-	FUNCTION  - a named stored function, plain or nested or in package
-	LOOP      - a loop/iterator context inside a routine, such as a 'foreach'
-	CONDITION - a conditional context inside a routine, such as an 'if'
+	PACKAGE   - an Oracle package; a namespace beneath a schema for related funcs and procs
+	TRIGGER   - a trigger on a table or schema view
+	PROCEDURE - a named stored procedure, under a schema or a package or nested under a rtn that is
+	FUNCTION  - a named stored function, under a schema or a package or nested under a rtn that is
+	BLOCK     - declares a compound statement that can contain other statements; eg BEGIN ... END
 
 	This list is probably missing some items.
 
@@ -876,10 +879,17 @@ These are the basic statement types that routines can contain.  Examples of
 statements are calls to stored procedures or some kinds of program logic
 control operations or value assignment operations.
 
-	ASSIGN - an assignment of an expression value to a variable
+	BLOCK - declares a compound statement that can contain other statements; eg BEGIN ... END
+	ASSIGN - an assignment of an expression value to a variable (SQL-2003 calls it 'SET')
+	RETURN - causes the routine to stop right away, and optionally returns a value
 	SPROC  - a call to a standard built-in procedure; one of standard_proc
 	UPROC  - a call to a user defined stored procedure (routine)
-	LOGIC  - some control-flow logic operation ...
+
+	Note: While it might conceptually go here, statements of type DECLARE will 
+	be added to a block/routine implicitely by the fact that routine_var nodes exist.
+	The SQL-2003 standard says DECLARE appears inside a BEGIN ... END block, not before 
+	it such as Oracle does.  It looks like "DECLARE <var name> <type name> [DEFAULT <expr>]".
+	The standard also says "SET foo = expr;" rather than the "foo := expr;" as in Oracle.
 
 	Note: For the moment we will consider DML activity like [select, insert,
 	update, delete, commit, rollback] to be an SPROC.
@@ -890,7 +900,6 @@ These are the standard built in procedures that can be called from routines.
 Various DML activity is included as a set of standard procedures.  For the
 present, no DDL-type actions are supported in routines.
 
-	RETURN - causes the routine to stop right away, and optionally returns a value
 	CURSOR_OPEN - opens a select cursor for reading from (or performs a select if in right context)
 	CURSOR_CLOSE - closes a select cursor when you're done with it
 	CURSOR_FETCH - reads a row from an opened cursor and puts it in a row/list variable
@@ -900,9 +909,11 @@ present, no DDL-type actions are supported in routines.
 	DELETE - deletes a row in a table/view
 	COMMIT - commits the current transaction, then starts a new one
 	ROLLBACK - rolls back the current transaction, then starts a new one
+
+The following possible built-in procedures currently lack rigorous definitions.
+
 	LOCK - 
 	UNLOCK - 
-	ROUTINE - 
 	PLAIN - 
 	THROW - 
 	TRY - 
@@ -920,6 +931,9 @@ present, no DDL-type actions are supported in routines.
 	MAP - 
 	GREP - 
 	REGEXP - 
+	LOOP - a loop/iterator context inside a routine, such as a 'foreach'
+	CONDITION - a conditional context inside a routine, such as an 'if'
+	LOGIC - some control-flow logic operation ...
 
 =head2 user_type
 
@@ -1694,8 +1708,12 @@ Attribute List:
 	routine - N.routine - PP - parent view of this one, if any; empty if this is the root view
 	p_view - N.view - PP - parent view of this one, if any; empty if this is the root view
 	match_all_cols - L.bool - use with view_type=MATCH; if true, this view matches every col; if false, view_col has list
-	c_merge_type - E.compound_operator - MCEE(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
+	compound_op - E.compound_operator - MCEE(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
+	distinct_rows - L.bool - (set quantifier) true, select|compound returns distinct rows; false, return all rows
 	may_write - L.bool - true when we should at least try allowing updates through the view
+
+	Note: setting distinct_rows to true results in "[SELECT|UNION|...] DISTINCT"; 
+	a false or undefined value results in "[SELECT|UNION|...] ALL".
 
 Unique Constraint List:
 
@@ -1986,8 +2004,9 @@ correspond to these SQL terms: "result list", "where", "group by", "having",
 "order by". All of these parts are optional, and often mutually exclusive. 
 However, "having" can only be used with "group by".
 
-The main parts that are not described here are the "from" (includes join
-definitions), and any "union" or similar operations, and any hierarchical
+The main parts that are not described here are the joined table definitions,
+most related parts of the "from" clause (except for invoked 'with' subquery
+arguments), compound operations (such as "union"), and any hierarchical
 operations.  See the other view_* tables for those.
 
 The "order by" described by this table is applied prior to any compound view
@@ -2160,7 +2179,7 @@ Attribute List:
 	return_var_type - E.basic_var_type - MCEE(routine_type=FUNCTION) - variable type of function's return value
 	return_domain - N.domain - MCEE(return_var_type=SCALAR) - domain of a function's scalar return value
 	trigger_event - E.basic_trigger_event - MCEE(routine_type=TRIGGER) - when a trigger executes
-	trigger_per_row - L.bool - MCEE(routine_type=TRIGGER) - true, exec each row, false, each stmt
+	trigger_per_stmt - L.bool - MCEE(routine_type=TRIGGER) - true, exec each stmt, false, each row
 
 Unique Constraint List:
 
@@ -2220,15 +2239,17 @@ Attribute List:
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	routine - N.routine - PP - MA - what routine this statement is in
 	stmt_type - E.basic_stmt_type - MA - what type of stmt this is; eg: assignment, condit, call, loop, dml, return
-	dest_arg - N.routine_arg - if the stmt type is 'assign', this 'out' arg is where the expression result goes
-	dest_var - N.routine_var - if the stmt type is 'assign', this var is where the expression result goes
+	block_routine - N.routine - MCEE(stmt_type=BLOCK) - this child routine defs contents of BEGIN ... END
+	dest_arg - N.routine_arg - if ASSIGN stmt, this 'out' arg may be where the expression result goes
+	dest_var - N.routine_var - if ASSIGN stmt, this var may be where the expression result goes
 	call_sproc - E.standard_proc - MCEE(stmt_type=SPROC) - this is the standard built-in procedure to call
 	curs_arg - N.routine_arg - if SPROC stmt that works with CURSOR, this arg may have the cursor
 	curs_var - N.routine_var - if SPROC stmt that works with CURSOR, this var may have the cursor
-	view_for_dml - N.view - if the statement is an insert/update/delete/etc (non-cursor) defined by a view, name it here
+	view_for_dml - N.view - if SPROC stmt that is an ins/upd/del/etc (non-cursor) def by a view, name it here
 	call_uproc - N.routine - MCEE(stmt_type=UPROC) - this is the user-defined stored function (routine) to call
 	catalog_link - N.catalog_link - if uproc in another catalog, say via which catalog link
-	c_routine - N.routine - if the stmt type starts an unnamed routine context, this is the child routine id
+
+	Note: For RETURN stmt, the value to be returned is defined by this stmts child expr.
 
 Unique Constraint List:
 
