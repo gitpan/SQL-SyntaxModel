@@ -1,0 +1,111 @@
+2004-03-22   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.28.
+
+	* There are 4 distributions being released simultaneously that all have the
+	same release number of 0.28; this is one of them.  They are:
+	SQL-SyntaxModel-0.28, SQL-SyntaxModel-ByTree-0.28,
+	SQL-SyntaxModel-SkipID-0.28, Rosetta-0.28.  Each of the latter 3 is
+	dependant on the first 1.  These 4 distributions cumulatively have almost
+	identical contents to the Rosetta-0.27 distribution, which is their sole
+	progenitor; that older distribution has hereby been split into 4 pieces
+	which will now be developed independently from each other.  All 4 new 
+	distributions inherit the external dependency on Locale-KeyedText-0.03.
+
+	* While those of Rosetta-0.27 were taken as a starting point, these CPAN
+	standard files have been changed to either a large or a small extent as
+	appropriate so that they represent the new 0.28 distribution: ChangeLog,
+	INSTALL, Makefile.PL, MANIFEST, ReadMe, TODO.  (META.yml is generated.)
+
+	* This ChangeLog file has been truncated to exclude the details from
+	releases 0.01 thru 0.27, as they aren't very useful going forward and take
+	up a lot of space (about 90 kilobytes).  If you want to read those details
+	then please look at an archived Rosetta-0.27 distribution, which is the
+	last one to have them.
+
+	* The distribution you are looking at now is the first one to bear the name
+	SQL-SyntaxModel.  For historical posterity, this is its file manifest:
+
+		- ChangeLog
+		- INSTALL
+		- lib/SQL/SyntaxModel.pm
+		- lib/SQL/SyntaxModel/API_C.pod
+		- lib/SQL/SyntaxModel/L/en.pm
+		- lib/SQL/SyntaxModel/Language.pod
+		- lib/t_SQL_SyntaxModel.pm
+		- LICENSE
+		- Makefile.PL
+		- MANIFEST
+		- META.yml                                Module meta-data (added by MakeMaker)
+		- ReadMe
+		- t/SQL_SyntaxModel.t
+		- TODO
+
+	* All modules with version numbers have seen theirs incremented by 0.01
+	compared to Rosetta-0.27, and all modules or scripts that use them now
+	require the new numbers; said modules did not have any other significant
+	changes.  In this distribution, SQL::SyntaxModel is now v0.15 and
+	SQL::SyntaxModel::L::en is now v0.05.
+
+	* A few other minor updates were made to several files.
+
+2004-03-21   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Rosetta-0.27, the last version of the distribution prior to its 4-way
+	split, was released on CPAN.
+
+2003-01-27   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Rosetta-0.02, the first version of the distribution under that name, 
+	was released on CPAN.
+
+2003-01-05   Darren Duncan <perl@DarrenDuncan.net>
+
+	* DBIx-Portable-0.01, the only version of the Rosetta distribution under
+	its previous name, was released on CPAN.
+
+2002-11-12   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Began development on the modules which became the pre-split Rosetta
+	distribution as their own entity that is separate from my application, for
+	open-source distribution on CPAN.  The modules were to comprise an
+	RDBMS-generic DB framework for any application to use.
+
+	* Modules based on a template created by h2xs 1.18.
+
+2002-07-28
+
+	* Posted the first significant update to the second prototype, which added
+	an index or cache for data that was expensive to calculate for each page
+	request, and involved rewriting about a fourth of the perl code.
+
+2002-06-07
+
+	* Posted to my website the second public prototype demo of the new
+	self-proprietary database driven application, whose database schema, user
+	interface, feature set, and Perl application code was almost completely
+	rewritten. The new version explicitly had separate modules for database
+	communication and the web interface logic, with MySQL-specific code and
+	database generic or data dictionary code in separate files, and separate
+	files for parts of the web interface.  The program used the same generic
+	CPAN modules as in the first prototype, DBI/MySQL and CGI::Portable.
+
+2001-11-24
+
+	* Posted the last update to the first prototype.
+
+2001-07-12
+
+	* Posted to my website the first public prototype demo of a new
+	self-proprietary database driven application, which is like a cross between
+	a multimedia metadata catalogue and a repository for historical or
+	genealogical data.  This application contained the first prototypes of code
+	that ended up in these modules.  All of this application's code, for
+	database communication and web interface logic, was situated in a single
+	module, with the rest of the program being more generic CPAN modules like
+	DBI (and DBD for MySQL) and CGI::Portable.
+
+2000-05-17
+
+	* Requested MySQL database privileges on my web host so I have something to
+	start developing, testing and deploying database driven applications on.

@@ -1,0 +1,214 @@
+=head1 NAME
+
+SQL::SyntaxModel::API_C - Describe the core C API for SQL::SyntaxModel
+
+=head1 COPYRIGHT AND LICENSE
+
+This file is part of the SQL::SyntaxModel library (libSQLSM).
+
+SQL::SyntaxModel is Copyright (c) 1999-2004, Darren R. Duncan.  All rights reserved.
+Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>, or
+visit "http://www.DarrenDuncan.net" for more information.
+
+SQL::SyntaxModel is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License (GPL) version 2 as published
+by the Free Software Foundation (http://www.fsf.org/).  You should have
+received a copy of the GPL as part of the SQL::SyntaxModel distribution, in the
+file named "LICENSE"; if not, write to the Free Software Foundation, Inc., 59
+Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+
+Linking SQL::SyntaxModel statically or dynamically with other modules is making
+a combined work based on SQL::SyntaxModel.  Thus, the terms and conditions of
+the GPL cover the whole combination.  As a special exception, the copyright
+holders of SQL::SyntaxModel give you permission to link SQL::SyntaxModel with
+independent modules, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting combined work under terms of
+your choice, provided that every copy of the combined work is accompanied by a
+complete copy of the source code of SQL::SyntaxModel (the version of
+SQL::SyntaxModel used to produce the combined work), being distributed under
+the terms of the GPL plus this exception.  An independent module is a module
+which is not derived from or based on SQL::SyntaxModel, and which is fully
+useable when not linked to SQL::SyntaxModel in any form.
+
+Any versions of SQL::SyntaxModel that you modify and distribute must carry
+prominent notices stating that you changed the files and the date of any
+changes, in addition to preserving this original copyright notice and other
+credits. SQL::SyntaxModel is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+
+While it is by no means required, the copyright holders of SQL::SyntaxModel
+would appreciate being informed any time you create a modified version of
+SQL::SyntaxModel that you are willing to distribute, because that is a
+practical way of suggesting improvements to the standard version.
+
+=head1 DESCRIPTION
+
+The first releases of SQL::SyntaxModel are being implemented in pure Perl 5
+thanks mainly to the heritage of original intention for using it with Perl
+programs, and otherwise to the fact that Perl is great for rapid prototyping,
+and has a large existing support for talking to databases, via the mature DBI
+framework, upon which to build.  One longer term goal, however, is that
+SQL::SyntaxModel will be a pure ANSI C library which has optional bindings for
+multiple other languages, such as C++, Objective-C, Perl 5 (most importantly),
+Parrot and Perl 6, Python, PHP 4+, Java, and whatever else users want.
+
+This has practical benefits such as compatability with databases for which
+there is no existing Perl support (all database drivers already have C
+support), and the ability to use it with any favorite programming language
+(which can bring in developers from those communities aka Parrot).  Moreover,
+and most easily guessed, C is a lot more efficient in both CPU and memory
+considering the huge amount of data processing that SQL::SyntaxModel has to do.
+ There are good reasons for things like LIBXML, GD, and DBI to be written in C
+which are applicable to SQL::SyntaxModel also.  To that end, SQL::SyntaxModel
+is being designed from the ground up to be easily implemented in either Perl 5
+or C, in both cases using an object-oriented conceptual process.
+
+This document is a reference for a SQL::SyntaxModel C API that is being
+planned, consisting mainly of the C header files (struct definitions and
+function declarations) that the actual SQL::SyntaxModel core will end up being.
+ After all, SQL::SyntaxModel is actually more of an interface or protocol
+definition than an actual implementation (although it includes those parts
+too).  This is intended to give programmers an idea why the design is going the
+way that it is and why details that pure Perl programs don't necessarily have
+to know about are being considered.  While pure C is not object oriented at
+all, the SQL::SyntaxModel API is designed to be as object-like as possible,
+such that each C struct for storing data will have a corresponding set of
+functions for interfacing with it, and the details for memory allocation and
+deallocation are handled by those also.
+
+Note that the core libraries are intended to not have any external
+dependencies, except for data type handling libraries such as for string or
+sparse list handling.  These classes do not do any I/O and they do not talk to
+the operating system, so they should be fully portable.  All such things are
+relegated to extensions like the Engines.
+
+Note also that the following should be considered almost-C rather than perfect
+C. The reasoning is that my experience in writing C is rusty at the moment and
+I haven't necessarily tried to compile these yet.  For the moment they are just
+a type of documentation.  They will be improved.
+
+=head1 AN ALTERNATIVE SECOND VERSION
+
+Inspired by the recent (February 2004) formation of dbdi-dev@perl.org, a group
+which aims to make a Parrot-native database access framework for all Parrot
+hosted languages, and that can talk to native database drivers through Parrot's
+Native Call Interface, meaning that the Parrot database project doesn't need
+any parts written in C, I may decide to take the same approach with the next
+major version of SQL::SyntaxModel and related projects, implementing it in IMC
+instead of C.
+
+=head1 CONTENT OF libSQLSM.h
+
+	#ifndef _libSQLSM_h
+	#define _libSQLSM_h
+
+	/************************************************************************/
+	/* define some simple data types here */
+
+	typedef unsigned char sqlsm_dt_flag; /* stores only two values: 0 (false) or 1 (true) */
+	typedef unsigned char sqlsm_dt_octet; /* a generic eight-bit value */
+	typedef unsigned int  sqlsm_dt_scale; /* a precise integer between 0 and +4,294,967,295 */
+	typedef struct {
+		sqlsm_dt_octet* string_data; /* not null terminated */
+		sqlsm_dt_scale  used_octets;
+		sqlsm_dt_scale  buff_octets;
+	} sqlsm_dt_label; /* an arbitrary sized UTF-8 character string, up to 4 gigabytes */
+
+	typedef enum { 
+		SQLSM_LITP_NUM_INT , /* an exact integral or whole number */
+		SQLSM_LITP_NUM_EXA , /* an exact decimal or fractional number */
+		SQLSM_LITP_NUM_APR , /* an approximately represented number (eg: floating point) */
+		SQLSM_LITP_STR_BIT , /* a string of bits or generic binary data */
+		SQLSM_LITP_STR_CHAR, /* a string of characters (encoding spec separately) */
+		SQLSM_LITP_BOOLEAN , /* two values: false or true */
+		SQLSM_LITP_DATETIME, /* a date or time or both */
+		SQLSM_LITP_INTERVAL  /* the amount of a time difference between two events */
+	} sqlsm_dt_literal_type; 
+
+	typedef enum { 
+		SQLSM_CHENTP_UTF8 , /* unicode UTF-8  */
+		SQLSM_CHENTP_UTF16, /* unicode UTF-16 */
+		SQLSM_CHENTP_UTF32, /* unicode UTF-32 */
+		SQLSM_CHENTP_ASC  , /* 8-bit ascii    */
+		SQLSM_CHENTP_EBS    /* 8-bit ebsdic   */
+		/* others will be added as appropriate */
+	} sqlsm_dt_char_enc_type; 
+
+	typedef struct {
+		sqlsm_dt_literal_type  literal_type ; /* says how to interpret other struct properties */
+		sqlsm_dt_scale         fixed_octets ; /* when literal is NUM_INT, NUM_APR; usu 1,2,4,8 */
+		sqlsm_dt_char_enc_type char_enc_type; /* when literal is a STR_CHAR, how it is encoded */
+		sqlsm_dt_octet*        literal_data ; /* not null terminated (or null part of trail junk) */
+			/* above never ref'd by mult structs; struct itself can be ref'd by multiple vars */
+		sqlsm_dt_scale         used_octets  ; /* doesn't include any trailing null with strings */
+		sqlsm_dt_scale         buff_octets  ; /* does include or surpass any trailing null */
+		/* other metadata may be added as appropriate; we may embed some fixed width type data */
+		sqlsm_dt_scale         malcvar_refs ; /* count of refs to this struct from malloc'd vars */
+	} sqlsm_dt_literal; 
+
+	/************************************************************************/
+	/* define some simple data types here */
+
+	typedef enum {
+		SQLSM_ENST_FOO, /* replace with semi-long actual list of generic enumerated value sets */
+		SQLSM_ENST_BAR
+	} sqlsm_dt_enum_set;
+
+	typedef enum {
+		SQLSM_ENIT_FOO, /* replace with long actual list of generic enumerated value set members */
+		SQLSM_ENIT_BAR  /* this enum may need repl w const list or ml en union, if sev key can't have same int */
+	} sqlsm_dt_enum_item;
+
+	typedef enum {
+		SQLSM_NDTP_FOO, /* replace with semi-short actual list of Node Types */
+		SQLSM_NDTP_BAR
+	} sqlsm_dt_node_type;
+
+	typedef enum {
+		SQLSM_NDATNM_FOO, /* replace with actual list of Node Attribute Names */
+		SQLSM_NDATNM_BAR  /* this enum may need repl w const list or ml en union, if sev key can't have same int */
+	} sqlsm_dt_node_atnm;
+
+	typedef struct {
+		sqlsm_dt_node_type  node_type  ; /* what type of Node this is */
+		sqlsm_dt_scale      node_id    ; /* uniq ident for Node within Container+Type */
+		sqlsm_dt_container* container  ; /* (ref) what Container this Node lives in, if any */
+		sqlsm_dt_literal*   at_literals; /* (array) attrs of Node which are literals */
+		sqlsm_dt_enum_item* at_enums   ; /* (array) attrs of Node which are enumerated values */
+		union { /* when 'container' is null, use 'id'; when it isn't null, use 'ref' */
+			sqlsm_dt_scale id ; /* id that has to be resolved to point to a Node */
+			sqlsm_dt_node* ref; /* pointer to a Node */
+		} id_or_ref*        at_nrefs   ; /* (array of id_or_ref) attrs of Node which are Nodes */
+			/* Note: if it would be better, we may combine all at* into one longer union list */
+		sqlsm_dt_node_atnm  p_node_atnm; /* name of at_nodes attribute which is our primary parent */
+		sqlsm_dt_flag       is_linked  ; /* true when actual refs in at_nodes are recipricated */
+		sqlsm_dt_node_dll*  child_nodes; /* (list of refs) recipr to Nodes whose at_nodes ref to us */
+	} sqlsm_dt_node;
+
+	typedef struct {
+		sqlsm_dt_node*     item; /* the actual Node represented by this list item */
+		sqlsm_dt_node_dll* next; /* next Node in list, if any */
+		sqlsm_dt_node_dll* prev; /* previous Node in list, if any */
+	} sqlsm_dt_node_dll; /* doubly-linked-list; use when number of list items not known in advance */
+
+	typedef struct {
+		sqlsm_dt_node_dll** all_nodes; /* (array of list of refs) all Nodes in this Container */
+			/* first dimension has one array element per allowed Node Type */
+			/* second dimension is a doubly-linked-list of all Nodes having that Node Type */
+			/* that list will probably get replaced with something more efficient at */
+			/* making sure each Node Id is only used once; and list order doesn't matter here */
+	} sqlsm_dt_container;
+
+	/************************************************************************/
+	/* define some accessor functions here */
+
+	/************************************************************************/
+
+	#endif /* _libSQLSM_h */
+
+=head1 SEE ALSO
+
+perl(1), SQL::SyntaxModel, SQL::SyntaxModel::Language, Rosetta, Rosetta::Framework.
+
+=cut

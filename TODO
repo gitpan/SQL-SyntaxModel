@@ -1,0 +1,4 @@
+The primary functional development of this module is done.  While further
+improvements are planned, they will be implemented over time as they are
+needed.  See the separately released "Rosetta" framework modules for a clue as
+they are the initial main dependents of SQL::SyntaxModel.
