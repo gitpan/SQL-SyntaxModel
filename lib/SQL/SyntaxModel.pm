@@ -11,9 +11,9 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.23';
+$VERSION = '0.24';
 
-use Locale::KeyedText 0.04;
+use Locale::KeyedText 0.06;
 
 ######################################################################
 
@@ -25,7 +25,7 @@ Standard Modules: I<none>
 
 Nonstandard Modules: 
 
-	Locale::KeyedText 0.04 (for error messages)
+	Locale::KeyedText 0.06 (for error messages)
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -920,7 +920,7 @@ my %NODE_TYPES = (
 	},
 	'command' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id application name command_type command_arg 
+			id application name command_type command_arg_1 command_arg_2
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -930,25 +930,20 @@ my %NODE_TYPES = (
 		},
 		$TPI_AT_NREFS => {
 			'application' => 'application',
-			'command_arg' => [$VAR_AT_NREFS_CCE],
+			'command_arg_1' => [$VAR_AT_NREFS_CCE],
+			'command_arg_2' => [$VAR_AT_NREFS_CCE],
 		},
 		$TPI_AT_NREFS_CCE => {
-			'command_arg' => ['command_type', {qw(
-				DB_LIST   data_link_product
-				DB_INFO   catalog
-				DB_VERIFY catalog
-				DB_CREATE catalog
-				DB_DELETE catalog
-				DB_CLONE  catalog
-				DB_MOVE   catalog
-				DB_OPEN   catalog
-				DB_CLOSE  catalog
-				DB_PING   catalog
-				DB_ATTACH catalog
-				DB_DETACH catalog
-				TRA_OPEN  catalog
-				TRA_CLOSE catalog
-				SCHEMA_LIST   catalog
+			'command_arg_1' => ['command_type', {qw(
+				DB_INFO   catalog_link
+				DB_VERIFY catalog_link
+				DB_CREATE catalog_link
+				DB_DELETE catalog_link
+				DB_CLONE  catalog_link
+				DB_MOVE   catalog_link
+				DB_OPEN   catalog_link
+				DB_ATTACH catalog_link
+				DB_DETACH catalog_link
 				SCHEMA_INFO   schema
 				SCHEMA_VERIFY schema
 				SCHEMA_CREATE schema
@@ -990,7 +985,6 @@ my %NODE_TYPES = (
 				ROUTINE_DELETE routine
 				ROUTINE_CLONE  routine
 				ROUTINE_UPDATE routine
-				USER_LIST   catalog_instance
 				USER_INFO   user
 				USER_VERIFY user
 				USER_CREATE user
@@ -1011,10 +1005,22 @@ my %NODE_TYPES = (
 				CALL_PROC routine
 				CALL_FUNC routine
 			)}],
+			'command_arg_2' => ['command_type', {qw(
+				DB_CLONE      catalog_link
+				DB_MOVE       catalog_link
+				SCHEMA_CLONE  schema
+				DOMAIN_CLONE  domain
+				SEQU_CLONE    sequence
+				TABLE_CLONE   table
+				VIEW_CLONE    view
+				ROUTINE_CLONE routine
+				USER_CLONE    user
+			)}],
 		},
 		$TPI_P_NODE_ATNMS => [qw( application )],
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( command_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application command_arg )},
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application )},
+		# Note: the command_arg_N attributes have implicit mandatory constraints.
 	},
 	'data_storage_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1790,7 +1796,12 @@ sub _resolve_variable_node_ref_attribute_type {
 			$node->_throw_error_message( $error_key_pfx.'_CCE_NO_LOOKUP_VAL', 
 				{ 'NAME' => $attr_name, 'LOOKUP' => $lookup_atnm } );
 		}
-		# Assume we are internally correct; if we get here, a hash value exists.
+		# Assume we are internally correct; if we get here, a hash value exists if the 
+		# attribute should be set, and it does not if the attribute should be empty.
+		unless( $rh_vals_to_ntypes->{$lookup_val} ) {
+			$node->_throw_error_message( $error_key_pfx.'_CCE_ATTR_MUST_BE_NULL', 
+				{ 'NAME' => $attr_name, 'LOOKUP' => $lookup_atnm, 'LOOKVAL' => $lookup_val } );
+		}
 		return( $rh_vals_to_ntypes->{$lookup_val} );
 	}
 	# Assume we can not have any other special case types.
@@ -2078,7 +2089,7 @@ sub put_in_container {
 	my ($node, $new_container) = @_;
 	defined( $new_container ) or $node->_throw_error_message( 'SSM_N_PI_CONT_NO_ARGS' );
 
-	unless( UNIVERSAL::isa( $new_container, 'SQL::SyntaxModel::Container' ) ) {
+	unless( ref($new_container) and UNIVERSAL::isa( $new_container, 'SQL::SyntaxModel::Container' ) ) {
 		$node->_throw_error_message( 'SSM_N_PI_CONT_BAD_ARG', { 'ARG' => $new_container } );
 	}
 
@@ -2474,7 +2485,8 @@ sub test_mandatory_attributes {
 	}
 
 	# Now test that Node ref attributes whose expected Node types can be variable 
-	# based on other Node attributes have the correct correspondence.
+	# based on other Node attributes have the correct correspondence; 
+	# also check if they are set or not set as appropriate.
 
 	if( my $variable_attrs = $type_info->{$TPI_AT_NREFS_CCE} ) {
 		my $at_enums = $node->{$NPROP_AT_ENUMS};
@@ -2486,11 +2498,27 @@ sub test_mandatory_attributes {
 			# then one of the mandatory value checks above would have caught it.
 			my $exp_node_type = $rh_vals_to_ntypes->{$lookup_val};
 			my $attr_value = $at_nrefs->{$attr_name};
-			unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE', 
+			if( !$exp_node_type and !$attr_value ) {
+				# No-op, no problem, $attr_value should be empty and is empty.
+			} elsif( !$exp_node_type and $attr_value ) {
+				# A null $exp_node_type means $attr_value should be null.
+				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_NULL', 
 					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-					'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
+					'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
 					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
+			} elsif( $exp_node_type and !$attr_value ) {
+				# A set $exp_node_type means $attr_value must be set.
+				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_SET', 
+					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
+			} else {
+				# A set $exp_node_type means $attr_value must have the same type.
+				unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
+					$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE', 
+						{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+						'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
+						'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
+				}
 			}
 		}
 	}
@@ -2614,10 +2642,14 @@ included.)  However, here are a few example usage lines:
 		$model->destroy();
 	};
 
-	if( $@ ) {
+	if( my $message = $@ ) {
 		my $translator = Locale::KeyedText->new_translator( ['SQL::SyntaxModel::L::'], ['en'] );
-		my $user_text = $translator->translate_message( $@ );
-		print "SOMETHING'S WRONG: $user_text" );
+		my $user_text = $translator->translate_message( $message );
+		unless( $user_text ) {
+			$user_text = ref($message) ? "internal error: can't find user text for a message: ".
+				$message->as_string()." ".$translator->as_string() : $message;
+		}
+		print "SOMETHING'S WRONG: $user_text\n";
 	}
 
 The above code sample is taken and slightly altered from a longer set of code
@@ -2657,8 +2689,8 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			</catalog>
 			<application id="1" name="Setup">
 				<catalog_link id="1" application="1" name="admin_link" target="1" />
-				<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg="1" />
-				<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg="1" />
+				<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg_1="1" />
+				<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg_1="1" />
 			</application>
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
@@ -3932,7 +3964,7 @@ cludge.>
 
 =head1 SEE ALSO
 
-perl(1), SQL::SyntaxModel::L::*, SQL::SyntaxModel::Language,
+perl(1), SQL::SyntaxModel::L::en, SQL::SyntaxModel::Language,
 SQL::SyntaxModel::API_C, Rosetta::Utility::SQLBuilder,
 SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID, Rosetta,
 Rosetta::Framework, DBI, SQL::Statement, SQL::Translator, SQL::YASP,

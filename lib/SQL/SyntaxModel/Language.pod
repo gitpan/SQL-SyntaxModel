@@ -145,7 +145,7 @@ this document goes into more detail on them):
 	- simple domains and user-defined data types (UDTs)
 	- enumerated data types
 	- arbitrary 'check' constraints (?)
-	- routines (stored procedures, user defined functions, triggers)
+	- routines (stored procedures, user defined functions, triggers, anonymous routines)
 	- named sub-routines inside routines
 	- row data types as variables inside routines
 	- multiple column unique and foreign key constraints on tables
@@ -153,31 +153,37 @@ this document goes into more detail on them):
 	- expressions in any part of a query
 	- regular expressions / pattern matching
 	- multiple-column predicates in any part of a query
-	- inner and outer table joins
-	- compound queries such as union, union all, intercept, except, distinct, etc
+	- cross, inner, and full|left|right outer table joins
+	- self joins (same table or view joined to itself N times)
+	- compound queries such as union, difference (except), intersection, exclusion
+	- 'all' and 'distinct' set quantifiers on both normal and compound queries
 	- 'where', 'group by', 'having', 'order by', 'limit'
 	- anonymous subqueries in any part of main query
 	- named subqueries ("with") likewise
+	- arguments for named subqueries
 	- recursive queries
+	- named (rather than positional) routine and subquery arguments
+	- select/insert/update/delete rows in tables and viewed tables
+	- named (rather than positional) mapping of 'into' clause to 'select list'
+	- named (rather than positional) mapping of all input data for both inserts and updates
 	- OLAP extensions, rollup, cube, grouping sets (related to group-by)
 	- updateable views; inserts, updates, deletes through any view (if key data not lost)
 	- "insert as select"
 	- multiple users, roles, privileges
-	- select/insert/update/delete rows in tables and viewed tables (Oracle supports latter, apparently)
 	- create/alter/delete schema objects
 	- create/alter/delete user defined functions
 	- create/alter/delete catalogs, schemas, users
 	- cursors
 	- multiple row insert / "write cursors"
 	- application bind variables for any data type
-	- all bind variables are named and not positional
+	- all bind variables are named (rather than positional)
 	- explicit transactions and nested transactions (and savepoints?)
 	- record locking for read and locking for write
 	- throwing exceptions
 	- catching and handling exceptions
-	- create, use simple sequence generators, named and on table cols (not in SQL standard, apparently)
+	- create, use simple sequence generators, named and on table cols
 	- temporary objects, usually tables
-	- triggers firing on DML events
+	- triggers firing on DML events of either tables or views
 	- "base tables" and "temporary base tables"
 
 This is a brief list of major non-supported features (at present):
@@ -187,11 +193,11 @@ This is a brief list of major non-supported features (at present):
 	- 'set' data types
 	- collection types such as arrays, stored in tables
 	- reference data types, stored in tables
-	- table hierarchies or subtables; anything not a "base table"
+	- table hierarchies or subtables; anything not a "base table" or "viewed table"
 	- object data types
 	- user defined "operators" (as being distinct from user defined functions)
 	- geographical data types and related extensions
-	- referencing objects in an "information schema" like normal schema objects (?)
+	- referencing objects in an "information schema" by users like normal schema objects (?)
 	- dynamic SQL; eg: generating and executing new SQL in a stored procedure
 	- creating user defined functions that aren't SQL (though they can be called)
 	- sequence generators will only produce integers, and not fractions or strings
@@ -960,9 +966,13 @@ There are several such context types, into which the Commands are grouped.  The
 result of executing a command often is a resource handle or something that
 provides a different context type for subsequent commands.
 
-Each 'command' Node takes one argument, which is another Node.  The valid Node
-type for that Node is different depending on what the command_type is.  The
-name of the Node type to use appears in parenthesis beside the command_type.
+Each 'command' Node takes one or more arguments, each of which is another Node.
+The valid Node type for that Node is different depending on what the
+command_type is.  The name of the Node type to use per argument appears in
+parenthesis beside the command_type.  Note that with CLONE commands, the second
+argument Node is used to say where to put the clone of what the first Node
+represents, and what to name it; the second Node is largely empty besides its
+"name" and primary parent attribute.
 
 I<According to SQL-1999, a transaction affects all types of SQL statements; if
 one is rolled back then it has no affect on SQL-schemas or SQL-data.  Or maybe 
@@ -970,86 +980,86 @@ it isn't quite that simple; see section 4.8.5 of SQL-1999.>
 
 These commands must be called in a "void" context and do not return any context:
 
-	DB_LIST(data_link_product) - fetches a list of auto-detectable database instances
-	DB_INFO(catalog)   - fetches some detailed info about a database instance
-	DB_VERIFY(catalog) - compares a provided db spec to an actual database
-	DB_CREATE(catalog) - creates a new database instance
-	DB_DELETE(catalog) - deletes a database instance
-	DB_CLONE(catalog)  - makes a clone of a db instance in another storage loc
-	DB_MOVE(catalog)   - moves a db inst from one storage location to another
+	DB_LIST()          - fetches a list of auto-detectable database instances
+	DB_INFO(catalog_link)   - fetches some detailed info about a database instance
+	DB_VERIFY(catalog_link) - compares a provided db spec to an actual database
+	DB_CREATE(catalog_link) - creates a new database instance
+	DB_DELETE(catalog_link) - deletes a database instance
+	DB_CLONE(catalog_link,catalog_link) - makes a clone of a db instance in another storage loc
+	DB_MOVE(catalog_link,catalog_link)  - moves a db inst from one storage location to another
 
 These commands must be called in a "void" context and return a "connection" context:
 
-	DB_OPEN(catalog)   - opens a link or connection to a database instance from an application
+	DB_OPEN(catalog_link) - opens a link or connection to a database instance from an application
 
 These commands must be called in a "connection" context and destroy that context:
 
-	DB_CLOSE(catalog)  - closes a link or connection to a database instance from an application
+	DB_CLOSE()            - closes a link or connection to a database instance from an application
 
 These commands must be called in a "connection" context:
 
-	DB_PING(catalog)   - verifies that a db connection is still open, that the db is accessible
-	DB_ATTACH(catalog) - attaches a link or connection to a database instance from another db instance
-	DB_DETACH(catalog) - detaches a link or connection to a database instance from another db instance
+	DB_PING()               - verifies that a db connection is still open, that the db is accessible
+	DB_ATTACH(catalog_link) - attaches a link or connection to a database instance from another db instance
+	DB_DETACH(catalog_link) - detaches a link or connection to a database instance from another db instance
 
 These commands must be called in a "connection" context and return a "transaction" context:
 
-	TRA_OPEN(catalog)  - opens a "lightweight connection" or transactional context to a db from an app
+	TRA_OPEN()  - opens a "lightweight connection" or transactional context to a db from an app
 
 These commands must be called in a "transaction" context and destroy that context:
 
-	TRA_CLOSE(catalog) - closes a "lightweight connection" or transactional context to a db from an app
+	TRA_CLOSE() - closes a "lightweight connection" or transactional context to a db from an app
 
 These commands must be called in a "transaction" context:
 
-	SCHEMA_LIST(catalog)  - fetches a list of schemas of open db instance
+	SCHEMA_LIST()         - fetches a list of schemas of open db instance
 	SCHEMA_INFO(schema)   - fetches some detailed info about a schemas
 	SCHEMA_VERIFY(schema) - compares a provided schema spec to an actual schemas
 	SCHEMA_CREATE(schema) - creates a new schema in catalog of open db inst
 	SCHEMA_DELETE(schema) - deletes an existing schema in open db inst (if it can)
-	SCHEMA_CLONE(schema)  - creates a clone of an existing schema with different name
+	SCHEMA_CLONE(schema,schema) - creates a clone of an existing schema with different name
 	SCHEMA_UPDATE(schema) - alters details for an existing schema
 	DOMAIN_LIST(schema)   - fetches a list of domains of open db instance
 	DOMAIN_INFO(domain)   - fetches some detailed info about a domain
 	DOMAIN_VERIFY(domain) - compares a provided domain spec to an actual domain
 	DOMAIN_CREATE(domain) - creates a new domain in schema of open db inst
 	DOMAIN_DELETE(domain) - deletes an existing domain in open db inst (if it can)
-	DOMAIN_CLONE(domain)  - creates a clone of an existing domain with different name
+	DOMAIN_CLONE(domain,domain) - creates a clone of an existing domain with different name
 	DOMAIN_UPDATE(domain) - alters details for an existing domain
 	SEQU_LIST(schema)     - fetches a list of sequence generators in schema of open db instance
 	SEQU_INFO(sequence)   - fetches some detailed info about a sequence
 	SEQU_VERIFY(sequence) - compares a provided sequence generator spec to an actual table
 	SEQU_CREATE(sequence) - creates a new sequence generator in schema of open db inst
 	SEQU_DELETE(sequence) - deletes an existing sequence generator in open db inst (if it can)
-	SEQU_CLONE(sequence)  - creates a clone of an existing sequence with different name
+	SEQU_CLONE(sequence,sequence) - creates a clone of an existing sequence with different name
 	SEQU_UPDATE(sequence) - alters details for an existing sequence generator
 	TABLE_LIST(schema)  - fetches a list of tables in schema of open db instance
 	TABLE_INFO(table)   - fetches some detailed info about a table
 	TABLE_VERIFY(table) - compares a provided table spec to an actual table
 	TABLE_CREATE(table) - creates a new table in schema of open db inst
 	TABLE_DELETE(table) - deletes an existing table in open db inst (if it can)
-	TABLE_CLONE(table)  - creates a clone of an existing table with different name
+	TABLE_CLONE(table,table) - creates a clone of an existing table with different name
 	TABLE_UPDATE(table) - alters details for an existing table
 	VIEW_LIST(schema) - fetches a list of views in schema of open db instance
 	VIEW_INFO(view)   - fetches some detailed info about a view
 	VIEW_VERIFY(view) - compares a provided view spec to an actual view
 	VIEW_CREATE(view) - creates a new view in schema of open db inst
 	VIEW_DELETE(view) - deletes an existing view in open db inst (if it can)
-	VIEW_CLONE(view)  - creates a clone of an existing view with different name
+	VIEW_CLONE(view,view) - creates a clone of an existing view with different name
 	VIEW_UPDATE(view) - alters details for an existing view
 	ROUTINE_LIST(schema)    - fetches a list of routines/procs/funcs of open db instance
 	ROUTINE_INFO(routine)   - fetches some detailed info about a routine
 	ROUTINE_VERIFY(routine) - compares a provided routine spec to an actual routine
 	ROUTINE_CREATE(routine) - creates a new routine in schema of open db inst
 	ROUTINE_DELETE(routine) - deletes an existing routine in open db inst (if it can)
-	ROUTINE_CLONE(routine)  - creates a clone of an existing routine with different name
+	ROUTINE_CLONE(routine,routine) - creates a clone of an existing routine with different name
 	ROUTINE_UPDATE(routine) - alters details for an existing routine
-	USER_LIST(catalog) - fetches a list of users in open db instance
+	USER_LIST()        - fetches a list of users in open db instance
 	USER_INFO(user)    - fetches some detailed info about a database user
 	USER_VERIFY(user)  - compares a provided user spec to an actual user
 	USER_CREATE(user)  - creates new db user one can auth DB_OPEN with (if privs)
 	USER_DELETE(user)  - deletes db user (as well as all schema it owns, if applic)
-	USER_CLONE(user)   - creates a clone of an existing user with different name
+	USER_CLONE(user,user) - creates a clone of an existing user with different name
 	USER_UPDATE(user)  - alters some details for a database user
 	USER_GRANT(user)   - grants a db privilege to a db user
 	USER_REVOKE(user)  - revokes a db privilege from a db user
@@ -1126,7 +1136,9 @@ flag of "MCR(foo)" only applies to Node types that can have parent Nodes of the
 same type, arranged in a tree; the attribute named in the parenthesis is null
 if the current Node is a root of its tree (could be of one element), and it is
 set when it is not a root; an MCR attribute must be set when the Node is a
-root, and it must not be set when the Node is not a root.
+root, and it must not be set when the Node is not a root.  Note that all
+attributes having an attribute type of "N.CCE" will also have an implicit
+dependant conditionally mandatory status.
 
 Note that for for any Node Type that has an attribute of 'name', that attribute
 is often one and the same thing as the 'identifier' in SQL; eg, a table 'name'
@@ -1984,9 +1996,12 @@ This type of Node describes an n-level hierarchical join to be part of a view
 compound definition (similar to Oracle's start-with-connect-by feature).  Only
 one is allowed per view.
 
-Note: While SQL::SyntaxModel supports the SQL-1999 "with" syntax, that among
-its other powers can do hierarchical queries, I have provided "view_hierarchy"
-as a way of invoking Oracle-style "start-with connect-by" tersely.
+Note: While SQL::SyntaxModel supports the SQL-2003/1999 "with" syntax, that
+among its other powers can do powerful hierarchical queries, I have provided
+"view_hierarchy" as a way of invoking simpler Oracle-style "start-with
+connect-by" tersely.
+
+I<Note: view_hierarchy should be considered a deprecated feature.>
 
 Attribute List:
 
@@ -2305,10 +2320,13 @@ Attribute List:
 	application - N.application - PP - MA - what application this Command belongs to
 	name - L.cstr - the name this command (pseudo-routine) is identified by in an application, if any
 	command_type - E.command_type - MA - what SQL::SyntaxModel recognized command to run
-	command_arg - N.CCE(command_type) - MA - an argument to the above command
+	command_arg_1 - N.CCE(command_type) - an argument to the above command
+	command_arg_2 - N.CCE(command_type) - an argument to the above command
 
 	Note: See the 'command_type' enumerated list documentation to see 
-	what Node type it expects for its command argument.
+	what Node type it expects for its command arguments.  Note that one 
+	or both of the arguments may be optional or required based on what 
+	the command_type is; most command types take exactly 1 argument.
 
 Unique Constraint List:
 
@@ -2669,6 +2687,6 @@ SQL::SyntaxModel::Command objects having types of: 'data_select', 'data_insert',
 
 =head1 SEE ALSO
 
-perl(1), SQL::SyntaxModel, Rosetta, Rosetta::Framework.
+SQL::SyntaxModel and the various other modules mentioned in its SEE ALSO.
 
 =cut

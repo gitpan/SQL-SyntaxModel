@@ -1,3 +1,49 @@
+2004-08-06   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.37.
+
+	* Updated external dependencies on Locale::KeyedText to v0.06.
+
+	* Updated all distribution code that makes use of UNIVERSAL::isa() to test
+	for valid objects so that it no longer incorrectly "passes" literal strings
+	whose string values match the class names of valid objects.  For each test,
+	"UNIVERSAL::isa($obj,'<class-name>')" was replaced with "ref($obj) and
+	UNIVERSAL::isa($obj,'<class-name>')".  Before the fixes, code that
+	UNIVERSAL::isa() was supposed to guard would eventually die with the
+	standard Perl error "Can't use string ('<class-name>') as a HASH ref",
+	rather than elegantly dealing with the bad input value.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.24) and en.pm (now
+	v0.09).  Updated the 'command' Node type (and the command_type enumerated
+	list) so that it can now possibly take anywhere from zero to two
+	command_args, depending on the command_type; renamed Node attribute
+	'command_arg' to 'command_arg_1' and added 'command_arg_2'; the 2 new
+	attributes are conditionally mandatory, the old 1 was always mandatory;
+	added 4 corresponding user messages.
+
+	* Most 'DB_*' commands now take 'catalog_link' Nodes as their argument(s)
+	rather than 'catalog' Nodes.  These commands now take zero arguments:
+	DB_LIST, DB_CLOSE, DB_PING, TRA_OPEN, TRA_CLOSE, SCHEMA_LIST, USER_LIST;
+	they know what to act on based on the context they are called in.  All
+	'*_CLONE' and '*_MOVE' commands now take 2 arguments, both of the same
+	type.  Updated Language.pod, SyntaxModel.pm, t_SQL_SyntaxModel.pm for this.
+
+	* Documentation updates to the SYNOPSIS in SyntaxModel.pm, and the FEATURE
+	SCOPE AND STANDARDS COMPLIANCE section in Language.pod, and a few other
+	small changes.
+
+	* Updated all user-text strings in en.pm so that the module-class name
+	appears at the start of each, to the left of the method names.  This should
+	make it easier for users to know which code file among many candidates is
+	generating any error messages they see.
+
+	* Updated SQL::SyntaxModel::API_C to bring the sample C code in "CONTENT OF
+	libSQLSM.h" partially up to date with the core distro files.  Rebuilt the
+	sqlsm_dt_literal_type and sqlsm_dt_char_enc_type enum definitions so they
+	are identical to those in Language.pod.  Updated the sqlsm_dt_node struct
+	definition to match the attr names and orders in SyntaxModel.pm.  No other
+	changes were made; the missing sqlsm_dt_container attrs are still missing.
+
 2004-07-04   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.36.

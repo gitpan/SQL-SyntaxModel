@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 ######################################################################
 
@@ -69,295 +69,315 @@ practical way of suggesting improvements to the standard version.
 
 ######################################################################
 
+my $CC = 'SQL::SyntaxModel::Container';
+my $CN = 'SQL::SyntaxModel::Node';
+
 my %text_strings = (
 	'SSM_C_GET_NODE_NO_ARG_TYPE' => 
-		"get_node(): missing NODE_TYPE argument",
+		"$CC.get_node(): missing NODE_TYPE argument",
 	'SSM_C_GET_NODE_NO_ARG_ID' => 
-		"get_node(): missing NODE_ID argument",
+		"$CC.get_node(): missing NODE_ID argument",
 	'SSM_C_GET_NODE_BAD_TYPE' => 
-		"get_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_C_GET_CH_NODES_BAD_TYPE' => 
-		"get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_C_GET_NFNI_NO_ARG_TYPE' => 
-		"get_next_free_node_id(): missing NODE_TYPE argument",
+		"$CC.get_next_free_node_id(): missing NODE_TYPE argument",
 	'SSM_C_GET_NFNI_BAD_TYPE' => 
-		"get_next_free_node_id(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CC.get_next_free_node_id(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_N_NEW_NODE_NO_ARGS' => 
-		"new_node(): missing NODE_TYPE argument",
+		"$CN.new_node(): missing NODE_TYPE argument",
 	'SSM_N_NEW_NODE_BAD_TYPE' => 
-		"new_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CN.new_node(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_N_DEL_NODE_IN_CONT' => 
-		"delete_node(): this Node can not be deleted because it is ".
+		"$CN.delete_node(): this Node can not be deleted because it is ".
 		"still in a Container; you must take it from there first",
 
 	'SSM_N_CLEAR_NODE_ID_IN_CONT' => 
-		"clear_node_id(): you can not clear the Node Id (value '{ID}') of this ".
+		"$CN.clear_node_id(): you can not clear the Node Id (value '{ID}') of this ".
 		"'{TYPE}' Node because the Node is in a Container",
 
 	'SSM_N_SET_NODE_ID_NO_ARGS' => 
-		"set_node_id(): missing NEW_ID argument",
+		"$CN.set_node_id(): missing NEW_ID argument",
 	'SSM_N_SET_NODE_ID_BAD_ARG' => 
-		"set_node_id(): invalid NEW_ID argument; a Node Id may only be a positive integer; ".
+		"$CN.set_node_id(): invalid NEW_ID argument; a Node Id may only be a positive integer; ".
 		"you tried to set it to '{ARG}'",
 	'SSM_N_SET_NODE_ID_DUPL_ID' => 
-		"set_node_id(): invalid NEW_ID argument; the Node Id value of '{ID}' you tried to set ".
+		"$CN.set_node_id(): invalid NEW_ID argument; the Node Id value of '{ID}' you tried to set ".
 		"is already in use by another '{TYPE}' Node in the same Container; it must be unique",
 
 	'SSM_N_EXP_LIT_AT_NO_ARGS' => 
-		"expected_literal_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_literal_attribute_type(): missing ATTR_NAME argument",
 	'SSM_N_EXP_LIT_AT_INVAL_NM' => 
-		"expected_literal_attribute_type(): invalid ATTR_NAME argument; ".
+		"$CN.expected_literal_attribute_type(): invalid ATTR_NAME argument; ".
 		"there is no literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
 
 	'SSM_N_SET_LIT_AT_NO_ARG_VAL' => 
-		"set_literal_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_literal_attribute(): missing ATTR_VALUE argument",
 	'SSM_N_SET_LIT_AT_INVAL_V_BOOL' => 
-		"set_literal_attribute(): invalid ATTR_VALUE argument; ".
+		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
 		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
 		"boolean value, as expressed by '0' or '1'; you tried to set it to '{VAL}'",
 	'SSM_N_SET_LIT_AT_INVAL_V_UINT' => 
-		"set_literal_attribute(): invalid ATTR_VALUE argument; ".
+		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
 		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
 		"non-negative integer; you tried to set it to '{VAL}'",
 	'SSM_N_SET_LIT_AT_INVAL_V_SINT' => 
-		"set_literal_attribute(): invalid ATTR_VALUE argument; ".
+		"$CN.set_literal_attribute(): invalid ATTR_VALUE argument; ".
 		"the literal attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be an ".
 		"integer; you tried to set it to '{VAL}'",
 
 	'SSM_N_SET_LIT_ATS_NO_ARGS' => 
-		"set_literal_attributes(): missing ATTRS argument",
+		"$CN.set_literal_attributes(): missing ATTRS argument",
 	'SSM_N_SET_LIT_ATS_BAD_ARGS' => 
-		"set_literal_attributes(): invalid ATTRS argument; ".
+		"$CN.set_literal_attributes(): invalid ATTRS argument; ".
 		"it is not a hash ref, but rather is '{ARG}",
 
 	'SSM_N_EXP_ENUM_AT_NO_ARGS' => 
-		"expected_enumerated_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_enumerated_attribute_type(): missing ATTR_NAME argument",
 	'SSM_N_EXP_ENUM_AT_INVAL_NM' => 
-		"expected_enumerated_attribute_type(): invalid ATTR_NAME argument; ".
+		"$CN.expected_enumerated_attribute_type(): invalid ATTR_NAME argument; ".
 		"there is no enumerated attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
 
 	'SSM_N_SET_ENUM_AT_NO_ARG_VAL' => 
-		"set_enumerated_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_enumerated_attribute(): missing ATTR_VALUE argument",
 	'SSM_N_SET_ENUM_AT_INVAL_V' => 
-		"set_enumerated_attribute(): invalid ATTR_VALUE argument; ".
+		"$CN.set_enumerated_attribute(): invalid ATTR_VALUE argument; ".
 		"the enumerated attribute named '{NAME}' in '{HOSTTYPE}' Nodes may only be a ".
 		"'{ENUMTYPE}' value; you tried to set it to '{VAL}'",
 
 	'SSM_N_SET_ENUM_ATS_NO_ARGS' => 
-		"set_enumerated_attributes(): missing ATTRS argument",
+		"$CN.set_enumerated_attributes(): missing ATTRS argument",
 	'SSM_N_SET_ENUM_ATS_BAD_ARGS' => 
-		"set_enumerated_attributes(): invalid ATTRS argument; ".
+		"$CN.set_enumerated_attributes(): invalid ATTRS argument; ".
 		"it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_EXP_NREF_AT_NO_ARGS' => 
-		"expected_node_ref_attribute_type(): missing ATTR_NAME argument",
+		"$CN.expected_node_ref_attribute_type(): missing ATTR_NAME argument",
 	'SSM_N_EXP_NREF_AT_INVAL_NM' => 
-		"expected_node_ref_attribute_type(): invalid ATTR_NAME argument; ".
+		"$CN.expected_node_ref_attribute_type(): invalid ATTR_NAME argument; ".
 		"there is no Node attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
 
 	'SSM_N_SET_NREF_AT_NO_ARG_VAL' => 
-		"set_node_ref_attribute(): missing ATTR_VALUE argument",
+		"$CN.set_node_ref_attribute(): missing ATTR_VALUE argument",
 	'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; the attribute named ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the attribute named ".
 		"'{NAME}' in '{HOSTTYPE}' Nodes may only reference a '{EXPTYPE}' Node, but ".
 		"you tried to set it to a '{GIVEN}' Node",
 	'SSM_N_SET_NREF_AT_DIFF_CONT' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is not in ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is not in ".
 		"the same Container as the current Node, so they can not be linked",
 	'SSM_N_SET_NREF_AT_ONE_CONT' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; a Node that is in a ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; a Node that is in a ".
 		"Container can not be linked to one that is not",
 	'SSM_N_SET_NREF_AT_MISS_NID' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node ".
 		"lacks a Node Id, and one is required to link to it from this one",
 	'SSM_N_SET_NREF_AT_BAD_ARG_VAL' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and a Node Id may only be a positive integer",
 	'SSM_N_SET_NREF_AT_CCE_NO_LOOKUP_VAL' => 
-		"set_node_ref_attribute(): the given ATTR_NAME argument can not be used at this ".
+		"$CN.set_node_ref_attribute(): the given ATTR_NAME argument can not be used at this ".
 		"time to set the Node attribute named '{NAME}' because that attribute can ".
 		"potentially take multiple Node types, and we don't have enough information ".
 		"yet to pick a type to resolve the given Node Id into; you can resolve this ".
 		"problem either by giving a Node for the ATTR_NAME argument, or by ".
 		"setting this Node's '{LOOKUP}' enumerated attribute first",
+	'SSM_N_SET_NREF_AT_CCE_ATTR_MUST_BE_NULL' => 
+		"$CN.set_node_ref_attribute(): the given ATTR_NAME argument can not be used at this ".
+		"time to set the Node attribute named '{NAME}' because that attribute must be ".
+		"left empty when this Node's '{LOOKUP}' enumerated attribute is set to '{LOOKVAL}'.",
 	'SSM_N_SET_NREF_AT_NONEX_NID' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and it does not match the Id of any '{EXPTYPE}' Node in this Container",
 	'SSM_N_SET_NREF_AT_RECIP_LINKS' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node is not yet ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; the given Node is not yet ".
 		"in reciprocating status, so the current Node can not yet become a child of it",
 	'SSM_N_SET_NREF_AT_CIRC_REF' => 
-		"set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is a direct ".
+		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; that Node is a direct ".
 		"or indirect child of the current Node, so they can not be linked; ".
 		"if they were linked, that would result in a circular reference chain",
 
 	'SSM_N_SET_NREF_ATS_NO_ARGS' => 
-		"set_node_ref_attributes(): missing ATTRS argument",
+		"$CN.set_node_ref_attributes(): missing ATTRS argument",
 	'SSM_N_SET_NREF_ATS_BAD_ARGS' => 
-		"set_node_ref_attributes(): invalid ATTRS argument; ".
+		"$CN.set_node_ref_attributes(): invalid ATTRS argument; ".
 		"it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_EXP_AT_MT_NO_ARGS' => 
-		"expected_attribute_major_type(): missing ATTR_NAME argument",
+		"$CN.expected_attribute_major_type(): missing ATTR_NAME argument",
 	'SSM_N_EXP_AT_MT_INVAL_NM' => 
-		"expected_attribute_major_type(): invalid ATTR_NAME argument; ".
+		"$CN.expected_attribute_major_type(): invalid ATTR_NAME argument; ".
 		"there is no attribute named '{NAME}' in '{HOSTTYPE}' Nodes",
 
 	'SSM_N_SET_ATS_NO_ARGS' => 
-		"set_attributes(): missing ATTRS argument",
+		"$CN.set_attributes(): missing ATTRS argument",
 	'SSM_N_SET_ATS_BAD_ARGS' => 
-		"set_attributes(): invalid ATTRS argument; ".
+		"$CN.set_attributes(): invalid ATTRS argument; ".
 		"it is not a hash ref, but rather is '{ARG}'",
 
 	'SSM_N_SET_P_NODE_ATNM_NO_ARGS' => 
-		"set_parent_node_attribute_name(): missing ATTR_NAME argument",
+		"$CN.set_parent_node_attribute_name(): missing ATTR_NAME argument",
 	'SSM_N_SET_P_NODE_ATNM_INVAL_NM' => 
-		"set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
+		"$CN.set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
 		"either there is no Node attribute named '{NAME}' in '{HOSTTYPE}' Nodes, ".
 		"or that attribute can not be used as the primary parent Node",
 	'SSM_N_SET_P_NODE_ATNM_CIRC_REF' => 
-		"set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
+		"$CN.set_parent_node_attribute_name(): invalid ATTR_NAME argument; ".
 		"the Node ref attribute named '{NAME}' is valued with a Node ".
 		"that is a direct or indirect child of the current Node, so that Node ".
 		"can not become the primary parent of the current Node; ".
 		"if it was, that would result in a circular reference chain",
 
 	'SSM_N_EST_P_NODE_ATNM_NO_ARGS' => 
-		"estimate_parent_node_attribute_name(): missing NEW_PARENT argument",
+		"$CN.estimate_parent_node_attribute_name(): missing NEW_PARENT argument",
 	'SSM_N_EST_P_NODE_ATNM_BAD_ARG' => 
-		"estimate_parent_node_attribute_name(): invalid NEW_PARENT argument; ".
+		"$CN.estimate_parent_node_attribute_name(): invalid NEW_PARENT argument; ".
 		"it is not a Node object, but rather is '{ARG}'",
 
 	'SSM_N_PI_CONT_NO_ARGS' => 
-		"put_in_container(): missing NEW_CONTAINER argument",
+		"$CN.put_in_container(): missing NEW_CONTAINER argument",
 	'SSM_N_PI_CONT_BAD_ARG' => 
-		"put_in_container(): invalid NEW_CONTAINER argument; ".
+		"$CN.put_in_container(): invalid NEW_CONTAINER argument; ".
 		"it is not a Container object, but rather is '{ARG}'",
 	'SSM_N_PI_CONT_NO_NODE_ID' => 
-		"put_in_container(): this Node can not be put in a Container yet ".
+		"$CN.put_in_container(): this Node can not be put in a Container yet ".
 		"as this Node has no NODE_ID defined",
 	'SSM_N_PI_CONT_HAVE_ALREADY' => 
-		"put_in_container(): this Node already lives in a Container; you ".
+		"$CN.put_in_container(): this Node already lives in a Container; you ".
 		"must take this Node from there before putting it in a different one",
 	'SSM_N_PI_CONT_DUPL_ID' => 
-		"put_in_container(): this Node can not be put into the given Container ".
+		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because its Node Id value of '{ID}' is already in use by another '{TYPE}' Node ".
 		"in the same Container; one of them needs to be changed first",
 	'SSM_N_PI_CONT_CCE_NO_LOOKUP_VAL' => 
-		"put_in_container(): this Node can not be put into the given Container ".
+		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"at this time because the Node attribute named '{NAME}' can potentially ".
 		"take multiple Node types, and we don't have enough information yet to pick ".
 		"a type to resolve the stored Node Id into; you can resolve this problem by ".
 		"setting this Node's '{LOOKUP}' enumerated attribute first",
+	'SSM_N_PI_CONT_CCE_ATTR_MUST_BE_NULL' => 
+		"$CN.put_in_container(): this Node can not be put into the given Container ".
+		"at this time because the Node attribute named '{NAME}' is valued, but it ".
+		"must be empty when this Node's '{LOOKUP}' enumerated attribute is set to '{LOOKVAL}'.",
 	'SSM_N_PI_CONT_NONEX_AT_NODE' => 
-		"put_in_container(): this Node can not be put into the given Container ".
+		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because the Node attribute named '{ATNM}' expects to link to a '{TYPE}' Node ".
 		"with a Node Id of '{ID}', but no such Node exists in the given Container",
 
 	'SSM_N_TF_CONT_RECIP_LINKS' => 
-		"take_from_container(): this Node can not be taken from its Container yet ".
+		"$CN.take_from_container(): this Node can not be taken from its Container yet ".
 		"as other Nodes that this Node refers to in its attributes have reciprocal links to it",
 
 	'SSM_N_ADD_RL_NO_NODE_ID' => 
-		"add_reciprocal_links(): this Node is not in a Container, ".
+		"$CN.add_reciprocal_links(): this Node is not in a Container, ".
 		"so no other Nodes can link to it as a child",
 
 	'SSM_N_REM_RL_HAS_CHILD' => 
-		"remove_reciprocal_links(): this Node has child Nodes of its ".
+		"$CN.remove_reciprocal_links(): this Node has child Nodes of its ".
 		"own, so it can not be removed from reciprocating status",
 
 	'SSM_N_MOVE_PRE_SIB_NO_RL' => 
-		"move_before_sibling(): this Node is not in reciprocating ".
+		"$CN.move_before_sibling(): this Node is not in reciprocating ".
 		"status and therefore it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_NO_S_ARG' => 
-		"move_before_sibling(): missing SIBLING argument",
+		"$CN.move_before_sibling(): missing SIBLING argument",
 	'SSM_N_MOVE_PRE_SIB_BAD_S_ARG' => 
-		"move_before_sibling(): invalid SIBLING argument; ".
+		"$CN.move_before_sibling(): invalid SIBLING argument; ".
 		"it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_MOVE_PRE_SIB_S_NO_RL' => 
-		"move_before_sibling(): invalid SIBLING argument; that Node is not in reciprocating ".
+		"$CN.move_before_sibling(): invalid SIBLING argument; that Node is not in reciprocating ".
 		"status and therefore it is not present in any child list; it has no siblings",
 	'SSM_N_MOVE_PRE_SIB_S_DIFF_CONT' => 
-		"move_before_sibling(): invalid SIBLING argument; that Node is not in ".
+		"$CN.move_before_sibling(): invalid SIBLING argument; that Node is not in ".
 		"the same Container (if any) as the current Node, so they can not be siblings",
 	'SSM_N_MOVE_PRE_SIB_BAD_P_ARG' => 
-		"move_before_sibling(): invalid PARENT argument; ".
+		"$CN.move_before_sibling(): invalid PARENT argument; ".
 		"it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_MOVE_PRE_SIB_P_DIFF_CONT' => 
-		"move_before_sibling(): invalid PARENT argument; that Node is not in ".
+		"$CN.move_before_sibling(): invalid PARENT argument; that Node is not in ".
 		"the same Container (if any) as the current Node, so they can not be related",
 	'SSM_N_MOVE_PRE_SIB_NO_P_ARG_OR_PP_OR_PS' => 
-		"move_before_sibling(): no PARENT argument was given, and the current Node ".
+		"$CN.move_before_sibling(): no PARENT argument was given, and the current Node ".
 		"has no primary parent Node or parent pseudo-Node for it to default to",
 	'SSM_N_MOVE_PRE_SIB_P_NOT_P' => 
-		"move_before_sibling(): invalid PARENT argument; ".
+		"$CN.move_before_sibling(): invalid PARENT argument; ".
 		"the current Node is not a child of that Node",
 	'SSM_N_MOVE_PRE_SIB_S_NOT_S' => 
-		"move_before_sibling(): invalid SIBLING argument; ".
+		"$CN.move_before_sibling(): invalid SIBLING argument; ".
 		"the current Node does not share PARENT (or its primary parent) with that Node",
 
 	'SSM_N_GET_CH_NODES_BAD_TYPE' => 
-		"get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
+		"$CN.get_child_nodes(): invalid NODE_TYPE argument; there is no Node Type named '{TYPE}'",
 
 	'SSM_N_ADD_CH_NODE_NO_ARGS' => 
-		"add_child_node(): missing NEW_CHILD argument",
+		"$CN.add_child_node(): missing NEW_CHILD argument",
 	'SSM_N_ADD_CH_NODE_BAD_ARG' => 
-		"add_child_node(): invalid NEW_CHILD argument; ".
+		"$CN.add_child_node(): invalid NEW_CHILD argument; ".
 		"it is not a Node object, but rather is '{ARG}'",
 	'SSM_N_ADD_CH_NODE_NO_EST' => 
-		"add_child_node(): the current Node can not be the primary parent of the given Node",
+		"$CN.add_child_node(): the current Node can not be the primary parent of the given Node",
 
 	'SSM_N_TEMA_ATS_NID_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node has failed a test; ".
 		"the Node ID must be given a value",
 	'SSM_N_TEMA_ATS_MA_LIT_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the literal attribute named '{NAME}' must always be given a value",
 	'SSM_N_TEMA_ATS_MA_ENUM_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must always be given a value",
 	'SSM_N_TEMA_ATS_MA_NREF_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must always be given a value",
 	'SSM_N_TEMA_ATS_NO_SINGLE_PP_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"exactly one of its primary parent Node attributes ({NAMES}) must have a value, and ".
 		"the others be undefined/null, but {NUMVALS} of these attributes are set now",
 	# Note, there currently are no $TPI_MCR_LITERALS.
 	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_YES_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be left undefined/null when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
 	'SSM_N_TEMA_ATS_MCR_ENUM_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be given a value when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
 	'SSM_N_TEMA_ATS_MCR_NREF_VAL_YES_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be left undefined/null when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' has a value defined",
 	'SSM_N_TEMA_ATS_MCR_NREF_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be given a value when the same ".
 		"Node's Node ref attribute named '{CHECKNM}' is undefined/null",
 	'SSM_N_TEMA_ATS_MCEE_LIT_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the literal attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
 	'SSM_N_TEMA_ATS_MCEE_ENUM_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the enumerated attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
 	'SSM_N_TEMA_ATS_MCEE_NREF_VAL_NO_SET' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
+	'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_NULL' => 
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the Node ref attribute named '{NAME}' must be left empty when this ".
+		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
+		"it currently references a '{GIVEN}' Node",
+	'SSM_N_TEMA_ATS_CCE_ATTR_MUST_BE_SET' => 
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"the Node ref attribute named '{NAME}' must have a value when this ".
+		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
 	'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE' => 
-		"test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
+		"$CN.test_mandatory_attributes(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the Node ref attribute named '{NAME}' may only reference a '{EXPTYPE}' Node when this ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
 		"it currently references a '{GIVEN}' Node",

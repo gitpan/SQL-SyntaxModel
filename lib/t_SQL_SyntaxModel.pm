@@ -135,13 +135,13 @@ sub create_and_populate_model {
 	my $cmd_install = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_install->set_literal_attribute( 'name', 'install_app_schema' );
 	$cmd_install->set_enumerated_attribute( 'command_type', 'DB_CREATE' );
-	$cmd_install->set_node_ref_attribute( 'command_arg', $catalog_bp );
+	$cmd_install->set_node_ref_attribute( 'command_arg_1', $setup_app_cl );
 
 	# Describe a command (pseudo-routine) for tearing down a database with our schema:
 	my $cmd_remove = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_remove->set_literal_attribute( 'name', 'remove_app_schema' );
 	$cmd_remove->set_enumerated_attribute( 'command_type', 'DB_DELETE' );
-	$cmd_remove->set_node_ref_attribute( 'command_arg', $catalog_bp );
+	$cmd_remove->set_node_ref_attribute( 'command_arg_1', $setup_app_cl );
 
 	# Describe a 'normal' application for viewing and editing database records:
 	my $editor_app = make_a_node( 'application', $model );
@@ -479,8 +479,8 @@ sub expected_model_xml_output {
 		</catalog>
 		<application id="1" name="Setup">
 			<catalog_link id="1" application="1" name="admin_link" target="1" />
-			<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg="1" />
-			<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg="1" />
+			<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg_1="1" />
+			<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg_1="1" />
 		</application>
 		<application id="2" name="People Watcher">
 			<catalog_link id="2" application="2" name="editor_link" target="1" />
@@ -616,7 +616,7 @@ sub test_circular_ref_prevention {
 		$vw2->set_node_ref_attribute( 'p_view', $vw3 );
 	};
 	if( my $exception = $@ ) {
-		if( UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
+		if( ref($exception) and UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
 			if( $exception->get_message_key() eq 'SSM_N_SET_NREF_AT_CIRC_REF' ) {
 				$test1_passed = 1;
 			}
@@ -628,7 +628,7 @@ sub test_circular_ref_prevention {
 		$vw3->set_parent_node_attribute_name( 'p_view' );
 	};
 	if( my $exception = $@ ) {
-		if( UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
+		if( ref($exception) and UNIVERSAL::isa( $exception, 'Locale::KeyedText::Message' ) ) {
 			if( $exception->get_message_key() eq 'SSM_N_SET_P_NODE_ATNM_CIRC_REF' ) {
 				$test2_passed = 1;
 			}

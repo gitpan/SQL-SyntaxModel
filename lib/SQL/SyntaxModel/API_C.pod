@@ -116,22 +116,25 @@ instead of C.
 	} sqlsm_dt_label; /* an arbitrary sized UTF-8 character string, up to 4 gigabytes */
 
 	typedef enum { 
-		SQLSM_LITP_NUM_INT , /* an exact integral or whole number */
-		SQLSM_LITP_NUM_EXA , /* an exact decimal or fractional number */
-		SQLSM_LITP_NUM_APR , /* an approximately represented number (eg: floating point) */
-		SQLSM_LITP_STR_BIT , /* a string of bits or generic binary data */
-		SQLSM_LITP_STR_CHAR, /* a string of characters (encoding spec separately) */
-		SQLSM_LITP_BOOLEAN , /* two values: false or true */
-		SQLSM_LITP_DATETIME, /* a date or time or both */
-		SQLSM_LITP_INTERVAL  /* the amount of a time difference between two events */
+		SQLSM_LITP_NUM_INT  , /* an exact integral or whole number/numeric */
+		SQLSM_LITP_NUM_EXA  , /* an exact decimal or fractional number/numeric */
+		SQLSM_LITP_NUM_APR  , /* an approximately represented number/numeric (eg: floating point) */
+		SQLSM_LITP_STR_BIT  , /* a string of bits or generic binary data (can store anything) */
+		SQLSM_LITP_STR_CHAR , /* a string of characters (encoding spec defined separately) */
+		SQLSM_LITP_BOOLEAN  , /* only two values: false or true */
+		SQLSM_LITP_DATM_FULL, /* a full datetime ('timestamp') having both YMD and HMS components */
+		SQLSM_LITP_DATM_DATE, /* a valid Gregorian (says the 2003,1999 standard) date having just YMD */
+		SQLSM_LITP_DATM_TIME, /* a valid time of day having just HMS components */
+		SQLSM_LITP_INTRVL_YM, /* a time duration having year-month (YM) intervals (year or month or both) */
+		SQLSM_LITP_INTRVL_DT  /* a time duration having day-time (DHMS) intervals (but not year or month) */
 	} sqlsm_dt_literal_type; 
 
 	typedef enum { 
-		SQLSM_CHENTP_UTF8 , /* unicode UTF-8  */
-		SQLSM_CHENTP_UTF16, /* unicode UTF-16 */
-		SQLSM_CHENTP_UTF32, /* unicode UTF-32 */
-		SQLSM_CHENTP_ASC  , /* 8-bit ascii    */
-		SQLSM_CHENTP_EBS    /* 8-bit ebsdic   */
+		SQLSM_CHENTP_UTF8  , /* unicode UTF-8 (always byte-order preserving; no big/little endian, usually 1 octet) */
+		SQLSM_CHENTP_UTF16 , /* unicode UTF-16 (has big/little endian versions) */
+		SQLSM_CHENTP_UTF32 , /* unicode UTF-32 (has big/little endian versions) */
+		SQLSM_CHENTP_ASCII , /* 8-bit ascii */
+		SQLSM_CHENTP_EBSDIC  /* 8-bit ebsdic */
 		/* others will be added as appropriate */
 	} sqlsm_dt_char_enc_type; 
 
@@ -173,7 +176,6 @@ instead of C.
 	typedef struct {
 		sqlsm_dt_node_type  node_type  ; /* what type of Node this is */
 		sqlsm_dt_scale      node_id    ; /* uniq ident for Node within Container+Type */
-		sqlsm_dt_container* container  ; /* (ref) what Container this Node lives in, if any */
 		sqlsm_dt_literal*   at_literals; /* (array) attrs of Node which are literals */
 		sqlsm_dt_enum_item* at_enums   ; /* (array) attrs of Node which are enumerated values */
 		union { /* when 'container' is null, use 'id'; when it isn't null, use 'ref' */
@@ -182,7 +184,8 @@ instead of C.
 		} id_or_ref*        at_nrefs   ; /* (array of id_or_ref) attrs of Node which are Nodes */
 			/* Note: if it would be better, we may combine all at* into one longer union list */
 		sqlsm_dt_node_atnm  p_node_atnm; /* name of at_nodes attribute which is our primary parent */
-		sqlsm_dt_flag       is_linked  ; /* true when actual refs in at_nodes are recipricated */
+		sqlsm_dt_container* container  ; /* (ref) what Container this Node lives in, if any */
+		sqlsm_dt_flag       links_recip; /* true when actual refs in at_nodes are recipricated */
 		sqlsm_dt_node_dll*  child_nodes; /* (list of refs) recipr to Nodes whose at_nodes ref to us */
 	} sqlsm_dt_node;
 
@@ -209,6 +212,6 @@ instead of C.
 
 =head1 SEE ALSO
 
-perl(1), SQL::SyntaxModel, SQL::SyntaxModel::Language, Rosetta, Rosetta::Framework.
+SQL::SyntaxModel and the various other modules mentioned in its SEE ALSO.
 
 =cut

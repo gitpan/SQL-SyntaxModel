@@ -1,11 +1,11 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         SQL-SyntaxModel
-version:      0.36
+version:      0.37
 version_from: 
 installdirs:  site
 requires:
-    Locale::KeyedText:             0.04
+    Locale::KeyedText:             0.06
 
 distribution_type: module
 generated_by: ExtUtils::MakeMaker version 6.17
