@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 use Locale::KeyedText 0.03;
 
@@ -136,7 +136,8 @@ my $NPROP_CHILD_NODES = 'child_nodes'; # array - list of refs to other Nodes hav
 # Currently only the codes are shown, but attributes may be attached later.
 my %ENUMERATED_TYPES = (
 	'simple_data_type' => { map { ($_ => 1) } qw(
-		NUM_INT NUM_EXA NUM_APR STR_BIT STR_CHAR BOOLEAN DATETIME INTERVAL
+		NUM_INT NUM_EXA NUM_APR STR_BIT STR_CHAR BOOLEAN 
+		DATM_FULL DATM_DATE DATM_TIME INTRVL_YM INTRVL_DT 
 	) },
 	'char_enc_type' => { map { ($_ => 1) } qw(
 		UTF8 UTF16 UTF32 ASCII EBCDIC
@@ -160,22 +161,20 @@ my %ENUMERATED_TYPES = (
 		DISTINCT ALL UNION INTERSECT EXCLUSIVE EXCEPT
 	) },
 	'join_operator' => { map { ($_ => 1) } qw(
-		EQUAL LEFT
+		CROSS INNER LEFT RIGHT FULL
 	) },
 	'view_part' => { map { ($_ => 1) } qw(
-		RESULT SET WHERE GROUP HAVING ORDER MAXR SKIPR
+		RESULT SET WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
 	) },
 	'basic_expr_type' => { map { ($_ => 1) } qw(
-		LIT COL MCOL VARG ARG VAR CVIEW SFUNC UFUNC
+		LIT COL MCOL VARG ARG VAR CAST SEQN CVIEW SFUNC UFUNC
 	) },
 	'standard_func' => { map { ($_ => 1) } qw(
-		TO_STR TO_NUM TO_INT TO_BOOL TO_DATE
 		NOT AND OR XOR
-		EQ NE LT GT LE GE IS_NULL NVL SWITCH LIKE
-		ADD SUB MUL DIV DIVI MOD ROUND EXP LOG MIN MAX AVG
+		EQ NE LT GT LE GE IS_NULL NOT_NULL COALESCE SWITCH LIKE
+		ADD SUB MUL DIV DIVI MOD ROUND ABS POWER LOG
 		SCONCAT SLENGTH SINDEX SUBSTR SREPEAT STRIM SPAD SPADL LC UC
-		GCOUNT GMIN GMAX GSUM GAVG GCONCAT GEVERY GANY GSOME
-		CROWID CROWNUM CLEVEL
+		COUNT MIN MAX SUM AVG CONCAT EVERY ANY SOME EXISTS
 	) },
 	'basic_var_type' => { map { ($_ => 1) } qw(
 		SCALAR RECORD ARRAY CURSOR
@@ -256,7 +255,7 @@ my %NODE_TYPES = (
 		$TPI_AT_SEQUENCE => [qw( 
 			id name base_type num_precision num_scale num_octets num_unsigned 
 			max_octets max_chars store_fixed char_enc trim_white uc_latin lc_latin 
-			pad_char trim_pad calendar range_min range_max 
+			pad_char trim_pad calendar with_zone range_min range_max 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -272,6 +271,7 @@ my %NODE_TYPES = (
 			'lc_latin' => 'bool',
 			'pad_char' => 'cstr',
 			'trim_pad' => 'bool',
+			'with_zone' => 'sint',
 			'range_min' => 'misc',
 			'range_max' => 'misc',
 		},
@@ -631,7 +631,7 @@ my %NODE_TYPES = (
 	'view_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id expr_type p_expr view view_part view_col 
-			set_view_col lit_val src_col match_col view_arg routine_arg routine_var
+			set_view_col lit_val src_col match_col view_arg routine_arg routine_var domain sequence 
 			call_view call_view_arg call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
@@ -652,6 +652,8 @@ my %NODE_TYPES = (
 			'view_arg' => 'view_arg',
 			'routine_arg' => 'routine_arg',
 			'routine_var' => 'routine_var',
+			'domain' => 'domain',
+			'sequence' => 'sequence',
 			'call_view' => 'view',
 			'call_view_arg' => 'view_arg',
 			'call_ufunc' => 'routine',
@@ -680,6 +682,7 @@ my %NODE_TYPES = (
 			'return_domain' => 'domain',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema trigger application p_routine )],
+		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( routine_type )},
 	},
 	'routine_arg' => {
@@ -745,7 +748,7 @@ my %NODE_TYPES = (
 	},
 	'routine_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id expr_type p_stmt p_expr lit_val src_arg src_var 
+			id expr_type p_stmt p_expr lit_val src_arg src_var domain sequence 
 			call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
@@ -760,6 +763,8 @@ my %NODE_TYPES = (
 			'p_expr' => 'routine_expr',
 			'src_arg' => 'routine_arg',
 			'src_var' => 'routine_var',
+			'domain' => 'domain',
+			'sequence' => 'sequence',
 			'call_ufunc' => 'routine',
 			'call_ufunc_arg' => 'routine_arg',
 			'catalog_link' => 'catalog_link',

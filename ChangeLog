@@ -1,3 +1,54 @@
+2004-05-01   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.30.
+
+	* This is a "middle of development" release that includes a large number of
+	changes, some of which are only partially implemented.  It exists largely
+	so that I can have a reliable backup for (and historical record of) the
+	last 3 weeks of in-progress work.  Some changes made now are incompatible
+	with 0.29, and likewise will be further changes to come in 0.31.
+
+	* Multiple corresponding updates in Language.pod and SyntaxModel.pm (now
+	v0.17) that are partly influenced by my close studying of the SQL-2003
+	standard, and partly by my attempts to build a SQL generator.  
+	
+	* Updated documentation to say that the SQL-2003 standard is now the focus 
+	of influence rather than SQL-1999 (or SQL-1992).
+
+	* Expanded the support for temporal data types / domains.  The 2
+	simple_data_type enumerated values of [DATETIME, INTERVAL] have become 5
+	values of [DATM_FULL, DATM_DATE, DATM_TIME, INTRVL_YM, INTRVL_DT].  Also
+	added new 'domain' Node attribute 'with_zone'.
+
+	* Expanded the support for table join operators.  The 2 join_operator
+	enumerated values of [EQUAL, LEFT] have become 5 values of [CROSS, INNER,
+	LEFT, RIGHT, FULL] (last 3 are outer-joins, INNER is renamed from EQUAL).  
+	As with before, there is no concept of a "natural" join at this level.
+
+	* Expanded the view_part enumerated value list to include WINDOW and other
+	matters for consideration.
+
+	* Expanded the basic_expr_type enumerated value list to add CAST and SEQN.
+	Added new attributes to "view_expr" and "routine_expr" Nodes named 'domain'
+	and 'sequence' that are respectively used with CAST and SEQN.
+
+	* Updated the standard_func enumerated value list in several ways.  Removed 
+	the TO_* casting functions, which for now are replaced by the CAST basic 
+	expression type.  Renamed NVL to COALESCE, EXP to POWER.  Added NOT_NULL, 
+	ABS.  Removed MIN, MAX, AVG as non-aggregate functions.  Removed CROWID, 
+	CROWNUM, CLEVEL, which will be replaced later.  Renamed the G* aggregate 
+	functions to the same names minus the leading 'G'.  Added EXISTS.
+	
+	* Added documentation regarding the recursiveness of views.
+
+	* The 'name' attribute of "routine" Nodes is now mandatory.
+
+	* Other small documentation updates in the same two files.  For example, 
+	"sequences" are now called "sequence generators".
+
+	* No updates were made to the test suite since it did not test the portions
+	of SQL::SyntaxModel that changed; the old suite still passes all its tests.
+
 2004-04-10   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.29.

@@ -93,14 +93,15 @@ featuritis.  This is not to say that I reject new and little used features; if
 I see their benefit and they are easy to implement, they get supported now.
 
 SQL::SyntaxModel is designed largely in the hindsight of the ANSI/ISO SQL-1999
-standard (and with some foresight of the yet-unpublished SQL-2003) and aims to
-conform to it as much as possible.  Where SQL-1999 and other SQL versions talk
+standard (and with some foresight of the yet-unfinalized SQL-2003) and aims to
+conform to it as much as possible.  Where SQL-2003 and other SQL versions talk
 about the same features using different words, SQL::SyntaxModel will either
-match the standard or resemble it the most.  Similarly, as SQL-1999 is fully
-upward compatible with SQL-1992, so the latter will be matched.  Unlike most
-shipping database products, which support mainly SQL-1992, I will support
-SQL-1999 (and 2003).  Note that SQL-1999 has identical ANSI and ISO standards,
-while SQL-1992 does not; this is a practical reason to focus on just 1999.
+match the standard or resemble it the most.  Similarly, as SQL-2003 and
+SQL-1999 are fully upward compatible with SQL-1992, so the latter will be
+matched.  Unlike most shipping database products, which support mainly
+SQL-1992, I will support SQL-2003 (and 1999).  Note that SQL-2003 and SQL-1999
+has identical ANSI and ISO standards, while SQL-1992 does not; this is a
+practical reason to focus on just 2003 and 1999.
 
 During my work on this project, I found the following resources to be
 particularly useful:
@@ -118,6 +119,10 @@ http://www.wiscorp.com/sql/sql1999_c3.zip (warning, large file)
 =item
 
 http://www.wiscorp.com/sql/sql_2003_standard.zip (warning, large file)
+
+=item
+
+http://www.sql-scripts.com/BookExcerpts/SQL99.zip (warning, large file)
 
 =back
 
@@ -176,6 +181,7 @@ this document goes into more detail on them):
 	- create, use simple sequence generators, named and on table cols (not in SQL standard, apparently)
 	- temporary objects, usually tables
 	- triggers firing on DML events
+	- "base tables" and "temporary base tables"
 
 This is a brief list of major non-supported features (at present):
 
@@ -184,14 +190,14 @@ This is a brief list of major non-supported features (at present):
 	- 'set' data types
 	- collection types such as arrays, stored in tables
 	- reference data types, stored in tables
-	- table hierarchies or subtables
+	- table hierarchies or subtables; anything not a "base table"
 	- object data types
 	- user defined "operators" (as being distinct from user defined functions)
 	- geographical data types and related extensions
 	- referencing objects in an "information schema" like normal schema objects (?)
 	- dynamic SQL; eg: generating and executing new SQL in a stored procedure
 	- creating user defined functions that aren't SQL (though they can be called)
-	- sequences will only produce integers, and not fractions or strings
+	- sequence generators will only produce integers, and not fractions or strings
 	- explic ref most "optimization" features; eg: hints, cache sett, res pre-alloc or limits, "tablespaces"
 	- explicit references to logs or replication managed by the database product itself
 	- named Oracle "synonyms" (?)
@@ -541,23 +547,31 @@ These are the enumerated attribute types that SQL::SyntaxModel knows about.
 =head2 simple_data_type
 
 These are the basic scalar data value types that table columns or view columns
-or routine variables or arguments can be.
+or routine variables or arguments can be.  The 1999 SQL standard indicates 5
+classes of simple (Predefined) data types: Numeric, String, Boolean, Datetime,
+Interval; all of the data types in those classes are represented by one of the
+following enumerated values.  The 2003 SQL standard adds a 6th one, XML, but we 
+will ignore that one for the moment.
 
-	NUM_INT  - an exact integral or whole number 
-	NUM_EXA  - an exact decimal or fractional number 
-	NUM_APR  - an approximately represented number (eg: floating point) 
-	STR_BIT  - a string of bits or generic binary data (can store anything)
-	STR_CHAR - a string of characters (encoding spec separately) 
-	BOOLEAN  - two values: false or true 
-	DATETIME - a date or time or both (when an event happens; also implements a 'DATE')
-	INTERVAL - the amount of a time difference between two events (also implements a 'TIME')
+	NUM_INT   - an exact integral or whole number/numeric
+	NUM_EXA   - an exact decimal or fractional number/numeric
+	NUM_APR   - an approximately represented number/numeric (eg: floating point) 
+	STR_BIT   - a string of bits or generic binary data (can store anything)
+	STR_CHAR  - a string of characters (encoding spec defined separately) 
+	BOOLEAN   - only two values: false or true 
+	DATM_FULL - a full datetime ('timestamp') having both YMD and HMS components
+	DATM_DATE - a valid Gregorian (says the 2003,1999 standard) date having just YMD
+	DATM_TIME - a valid time of day having just HMS components
+	INTRVL_YM - a time duration having year-month (YM) intervals (year or month or both)
+	INTRVL_DT - a time duration having day-time (DHMS) intervals (but not year or month)
 
 =head2 char_enc_type
 
-These are the set of known character string encodings that can be used by
-character data, with Unicode (or UTF-8 specifically) being the recommended one
-to use when possible, and with Ascii being the most common legacy encoding. 
-Encodings are only applicable to data whose simple_data_type is STR_CHAR.
+These are the set of known character string encodings or named sets of
+characters (character repertoires) that can be used by character data, with
+Unicode (or UTF-8 specifically) being the recommended one to use when possible,
+and with Ascii being the most common legacy encoding. Encodings are only
+applicable to data whose simple_data_type is STR_CHAR.
 
 	UTF8   - unicode UTF-8  (always byte-order preserving; no big/little endian, usually 1 octet)
 	UTF16  - unicode UTF-16 (has big/little endian versions)
@@ -575,7 +589,7 @@ relative to and counted with.  For each, year zero could be at a different
 event, and other differences like what months or other yearly divisions there
 are would also distinguish the calendars.  Use "absolute" if you don't want to
 pick any calendar in particular.  These are only applicable to data whose
-simple_data_type is DATETIME.
+simple_data_type is DATM_FULL or DATM_DATE (or perhaps DATM_TIME also).
 
 	ABS - "absolute", for non-calendar-specific dates and times
 	GRE - the Gregorian calendar
@@ -633,7 +647,7 @@ convenience.
 
 Both SCHEMA and APPLIC views (and INSIDE children) may not use any variables
 (except 'with' for children).  Any views with variables must be declared within
-routines (even if only their child INNER have them), either database or
+routines (even if only their child INSIDE have them), either database or
 application level; the variables are provided via the routines.
 
 =head2 view_type
@@ -649,6 +663,11 @@ possibly any child views.
 	COMPOUND - consists of several "select ..." (each defined by a child view) connected by a compound operator
 	SUBQUERY - contains subqueries but not recursive, either in "from", "where", elsewhere
 	RECURSIVE - a recursive query, either invoking itself in a "with" clause, or using "start-with connect-by"
+
+	Note that 'main' views are never RECURSIVE (they are SUBQUERY); only 
+	nested queries (subqueries) declared in a 'with' clause can be recursive.
+	That is, all recursive views have another view as their parent.
+	An exception is those that use start-with...
 
 =head2 compound_operator
 
@@ -673,18 +692,20 @@ from exactly one input, and values in columns from separate sources are aligned
 into common rows on related row values.  This is the most common way of
 "relating" data in relational databases.
 
-	EQUAL - an equal-join; only rows with related entries in both sources are kept
-	LEFT  - a left-join; all rows from first source kept even if not matched in second
+	CROSS - a cross-join; a cartesian product; every combination of first and second rows kept
+	INNER - an inner/equal-join; only rows with related entries in both sources are kept
+	LEFT  - a left-outer-join; all rows from first source kept even if not matched in second
+	RIGHT - a right-outer-join; all rows from second source kept even if not matched in first
+	FULL  - a full-outer-join; all rows from both sources kept even if un-matched
 
-	A right-join may also be added, but its value is dubious at the moment.  
-	Also, there is no concept of a "natural" join at this level of activity, and should not be.
-	Full outer join may also be added.
+	There is no concept of a "natural" join at this level of activity, and should not be.
+	Use CROSS if normal joins not sufficient; where-clause used for basic matching.
 	Note: SQLite supports this: [NATURAL ][LEFT |RIGHT |FULL ][OUTER |INNER |CROSS ].
 
 =head2 view_part
 
 These are the standard parts of a view/query definition that are not in the
-"from" part.
+"from" part.  
 
 	RESULT - the result list at the top; one item per "view_col" per view
 	INTO   - when outer view is read from in a routine (select or fetch), this is the "into" part
@@ -692,9 +713,20 @@ These are the standard parts of a view/query definition that are not in the
 	WHERE  - the SQL "where" part
 	GROUP  - the SQL "group by" part
 	HAVING - the SQL "having" part
+	WINDOW - ... to replace ORDER,MAXR,SKIPR; or such as those will implement WINDOW instead
 	ORDER  - the SQL "order by" part
 	MAXR   - says to page the results, and how many rows per page, corresponds to SQL "limit" first part
 	SKIPR  - says how many of the first rows to skip before returing the next ones, corr to "limit" second part
+
+	Note that SQL::SyntaxModel may need more metadata to represent parts of a GROUP BY 
+	clause, such as OLAP extensions ... or it may not.
+
+	According to SQL-2003 Foundation 7.11 (p331), the WINDOW clause in a query seems 
+	to contain/replace the likes of ORDER BY, LIMIT/MAXR, OFFSET/SKIPR, but it is 
+	more powerful than that.  SQL::SyntaxModel may need more metadata to do this right.
+
+	Note that several databases like Postgres and SQLite use LIMIT for MAXR 
+	and OFFSET for SKIPR.  I may do that too.
 
 =head2 basic_expr_type
 
@@ -710,6 +742,8 @@ variables or columns).
 	VARG  - when view is a "with" sub-query, use value of an argument to the view
 	ARG   - use value of an arg to the current routine, or fetch 'into' it if INTO view part
 	VAR   - use value of a variable declared in the current routine, or fetch 'into' it if INTO view part
+	CAST  - cast the single child expression into a different data-type specified by a domain node
+	SEQN  - use "next" value from a named user defined sequence generator (schema object)
 	CVIEW - use result of a call to a view, such as a subquery or a cursor
 	SFUNC - use result of a call to a standard built-in function; one of standard_func
 	UFUNC - use result of a call to a user defined stored function (routine)
@@ -719,13 +753,8 @@ variables or columns).
 These are the standard built in functions that can be used as parts of view
 definitions or code routines like stored procedures or functions or triggers. 
 If any description contains "aggregate", it means the function is an aggregate
-function (a grouping func, like 'count')
+function (a grouping func, like 'count').
 
-	TO_STR  - cast arg as string (might take more args)
-	TO_NUM  - cast arg as numeric (might take more args)
-	TO_INT  - cast arg as integer (might take more args)
-	TO_BOOL - cast arg as boolean (might take more args)
-	TO_DATE - cast arg as datetime (might take more args)
 	NOT     - a logical 'not', true iif lone arg is false
 	AND     - a logical 'and', true iif every arg is true
 	OR      - a logical 'or', true iif at least one arg is true
@@ -737,8 +766,9 @@ function (a grouping func, like 'count')
 	LE      - true if first arg is less than or equal to second
 	GE      - true if first arg is greater than or equal to second
 	IS_NULL - true if only arg is a null value
-	NVL     - aka COALESCE (SQL-92 name) - returns arg 1 if it is not null, else arg 2
-	SWITCH  - a logical switch-case expr (like Oracle 'decode')
+	NOT_NULL - true if only arg is not a null value
+	COALESCE - returns first arg which is not null (like Oracle 'NVL')
+	SWITCH  - a logical switch-case expr (like Oracle 'DECODE')
 	LIKE    - true if first arg contains second; args 3,4 are flags
 	ADD     - result of adding all args as numbers
 	SUB     - result of subtracting all subsequent args from first
@@ -747,11 +777,9 @@ function (a grouping func, like 'count')
 	DIVI    - integral division of first arg by second
 	MOD     - modulus of integral division of first arg by second
 	ROUND   - rounds first arg to N dec places; N is second arg or 0
-	EXP     - raises first arg to the power of the second
+	ABS     - absolute value of the operand (distance from zero)
+	POWER   - raises first arg to the power of the second
 	LOG     - logarithm of the first arg on the base of second
-	MIN     - minimum arg value of all arguments
-	MAX     - maximum arg value of all arguments
-	AVG     - average value of all arguments
 	SCONCAT - L.cstr concat of all arguments
 	SLENGTH - length of input string in characters
 	SINDEX  - pos in arg 1 of arg 2 if present, start at arg 3
@@ -760,25 +788,26 @@ function (a grouping func, like 'count')
 	STRIM   - trims leading and trailing whitespace from arg 1
 	SPAD    - lengthens arg 1 to length of arg 2 using arg 3 or space
 	SPADL   - like spad but add filler on left rather than right
-	LC      - lowercases latin chars in a string
-	UC      - uppercases latin chars in a string
-	GCOUNT  - aggregate - count of rows a view/cursor can see
-	GMIN    - aggregate - minimum of values in all records in one view col
-	GMAX    - aggregate - maximum of values in all records in one view col
-	GSUM    - aggregate - sum of values in all records in one view col
-	GAVG    - aggregate - average of values in all records in one view col
-	GCONCAT - aggregate - L.cstr concat of values in all records in one view col
-	GEVERY  - aggregate - is true when all rec values in one col are true
-	GANY    - aggregate - is true when at least one rec value in one col is true
-	GSOME   - aggregate - is true when some rec values are true
-	CROWID  - unique database-generated row id of returned row (=rowid?)
-	CROWNUM - row number of returned row, before sorting (eg:Oracle)
-	CLEVEL  - when using st-wi-cn-by, what hierarchy level row is in (eg:Oracle)
+	LC      - lowercases latin chars in a string (SQL-2003 says this is a type of "folding")
+	UC      - uppercases latin chars in a string (SQL-2003 says this is a type of "folding")
+	COUNT   - aggregate - count of rows a view/cursor can see
+	MIN     - aggregate - minimum of values in all records in one view col
+	MAX     - aggregate - maximum of values in all records in one view col
+	SUM     - aggregate - sum of values in all records in one view col
+	AVG     - aggregate - average of values in all records in one view col
+	CONCAT  - aggregate - L.cstr concat of values in all records in one view col
+	EVERY   - aggregate - is true when all rec values in one col are true
+	ANY     - aggregate - is true when at least one rec value in one col is true
+	SOME    - aggregate - is true when some rec values are true
+	EXISTS  - aggregate - is true when if there are > 0 rows
 
 	Note that the function list is incomplete and will grow over time.  It does not currently 
 	mention functions for working with view/cursor subqueries, such as "in" (field in subquery), 
 	and also doesn't include any list operators, such as for comparing a list of field names to 
 	a subquery that returns multiple columns (as I suspect MySQL 4.1 supports).
+
+	I took out CROWID, CROWNUM, CLEVEL; there exist replacements for such as these, 
+	such as in SQL-2003, 7.14 "<search or cycle clause>" (p365).
 
 =head2 basic_var_type
 
@@ -897,6 +926,10 @@ There are several such context types, into which the Commands are grouped.  The
 result of executing a command often is a resource handle or something that
 provides a different context type for subsequent commands.
 
+I<According to SQL-1999, a transaction affects all types of SQL statements; if
+one is rolled back then it has no affect on SQL-schemas or SQL-data.  Or maybe 
+it isn't quite that simple; see section 4.8.5 of SQL-1999.>
+
 These commands must be called in a "void" context and do not return any context:
 
 	DB_LIST      - fetches a list of auto-detectable database instances
@@ -931,13 +964,13 @@ These commands must be called in a "transaction" context and destroy that contex
 
 These commands must be called in a "transaction" context:
 
-	SEQU_LIST    - fetches a list of sequences in schema of open db instance
+	SEQU_LIST    - fetches a list of sequence generators in schema of open db instance
 	SEQU_INFO    - fetches some detailed info about a sequence
-	SEQU_VERIFY  - compares a provided sequence spec to an actual table
-	SEQU_CREATE  - creates a new sequence in schema of open db inst
-	SEQU_DELETE  - deletes an existing sequence in open db inst (if it can)
+	SEQU_VERIFY  - compares a provided sequence generator spec to an actual table
+	SEQU_CREATE  - creates a new sequence generator in schema of open db inst
+	SEQU_DELETE  - deletes an existing sequence generator in open db inst (if it can)
 	SEQU_CLONE   - creates a clone of an existing sequence with different name
-	SEQU_UPDATE  - alters schema for an existing sequence
+	SEQU_UPDATE  - alters schema for an existing sequence generator
 	TABLE_LIST   - fetches a list of tables in schema of open db instance
 	TABLE_INFO   - fetches some detailed info about a table
 	TABLE_VERIFY - compares a provided table spec to an actual table
@@ -1027,6 +1060,10 @@ says "MC(...)" then the attribute is only mandatory when the other attribute
 named in the parenthesis is populated, or if the expression in the parenthesis
 is true.
 
+Note that for for any Node Type that has an attribute of 'name', that attribute
+is often one and the same thing as the 'identifier' in SQL; eg, a table 'name'
+is the table's 'identifier'.
+
 I<Many of the Node Type explanations come with a list of example Nodes,
 formatted like a table, one row per Node, one column per attribute.  Starting
 with SQL::SyntaxModel version 0.10, the order that the Nodes appear in is
@@ -1045,7 +1082,7 @@ identifier that can be referenced by entities such as table column definitions,
 view column definitions, and routine variables, as their "data type"; 2. The
 domain can impose restrictions within the base data type as to what values can
 be stored (eg: a STR_CHAR may only be 30 characters long, or a NUM_EXA may only
-be 5 digits wide with 2 digits on the right of the decimal point); 3. The
+be 5 digits wide with 2 digits on the right of the radix point); 3. The
 domain can define simple pre or post processing of values, such as trimming of
 bounding whitespace or uppercasing its contents.
 
@@ -1071,7 +1108,7 @@ Attribute List:
 	name - L.cstr - MA - name of the user customized data type
 	base_type - E.simple_data_type - MA - name of the base data type this data_type is customized from
 	num_precision - L.uint - max length in digits for exact number, or count of significant digits for inexact 
-	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the decimal point
+	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the radix point
 	num_octets - L.uint - for integral or inexact (floating point) numbers, fixed storage size in octets
 	num_unsigned - L.bool - for numbers, true means only values >= 0 may be stored
 	max_octets - L.uint - MC(base_type=STR_BIT) - maximum size in octets for a binary/bit string
@@ -1083,7 +1120,8 @@ Attribute List:
 	lc_latin - L.bool - do we lowercase latin chars in STR_CHAR before writing (no change on reading)
 	pad_char - L.cstr - when store_fixed is true then pad actual value with this to max size on save
 	trim_pad - L.bool - when store_fixed is true then trim padding on read from STR_CHAR field/var
-	calendar - E.calendar - MC(base_type=DATETIME) - what calendar the date and time (or date only) is in
+	calendar - E.calendar - MC(base_type=DATM_FULL,DATM_DATE) - what calendar the date and time (or date only) is in
+	with_zone - L.sint - if timestamp/time to include a 'with time zone', this says what time zone
 	range_min - L.misc - when applicable, what the allowed minimum value is (for bounds/check constraint)
 	range_max - L.misc - when applicable, what the allowed maximum value is (for bounds/check constraint)
 
@@ -1094,35 +1132,35 @@ Unique Constraint List:
 
 Example List:
 
-	|id|name    |base    |np |ns|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
-	|--|--------|--------|---|--|--|--|-----|----|--|-----|--|--|--|--|---|
-	| 1|bin1k   |STR_BIT |   |  |  |  | 1000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 1000 octets
-	| 2|bin32k  |STR_BIT |   |  |  |  |32000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 32000 octets
-	| 3|str4    |STR_CHAR|   |  |  |  |     |   4|1 |ASCII|1 |1 |20|1 |   | - a fix-w 4 char ascii cstr, uppercased, spc-pad
-	| 4|str10   |STR_CHAR|   |  |  |  |     |  10|1 |ASCII|1 |  |20|1 |   | - a fix-w 10 char ascii cstr, case-preserve, spc-pad
-	| 5|str30   |STR_CHAR|   |  |  |  |     |  30|  |ASCII|1 |  |  |  |   | - a fix-w 30 char ascii cstr, case-preserving
-	| 6|str2k   |STR_CHAR|   |  |  |  |     |2000|  |UTF8 |  |  |  |  |   | - a var-w 2000 char unicode cstr, case-preserving
-	| 7|byte    |NUM_INT |   |  | 1|  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
-	| 8|short   |NUM_INT |   |  | 2|  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
-	| 9|int     |NUM_INT |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
-	|10|long    |NUM_INT |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
-	|11|ubyte   |NUM_INT |   |  | 1|1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
-	|12|ushort  |NUM_INT |   |  | 2|1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
-	|13|uint    |NUM_INT |   |  | 4|1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
-	|14|ulong   |NUM_INT |   |  | 8|1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
-	|15|float   |NUM_APR |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit imprecise fractional number
-	|16|double  |NUM_APR |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit imprecise fractional number
-	|17|dec10p2 |NUM_EXA | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths scale
-	|18|dec255  |NUM_EXA |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary scale
-	|19|boolean |BOOLEAN |   |  |  |  |     |    |  |     |  |  |  |  |   | - a boolean; only 2 values of false or true
-	|20|datetime|DATETIME|   |  |  |  |     |    |  |     |  |  |  |  |ABS| - a date and time or date, non-calendar specific
-	|21|dtchines|DATETIME|   |  |  |  |     |    |  |     |  |  |  |  |CHI| - a date and time or date, in the Chinese calendar
-	|22|sex     |STR_CHAR|   |  |  |  |     |   1|  |     |  |  |  |  |   | - a 1-char string, constrained to 'M' and 'F'
-	|23|str20   |STR_CHAR|   |  |  |  |     |  20|  |     |  |  |  |  |   | - a 20-char string
-	|24|str100  |STR_CHAR|   |  |  |  |     | 100|  |     |  |  |  |  |   | - a 100-char string
-	|25|str250  |STR_CHAR|   |  |  |  |     | 250|  |     |  |  |  |  |   | - a 250-char string
-	|26|entitynm|STR_CHAR|   |  |  |  |     |  30|  |     |  |  |  |  |   | - a short string suitable for naming things
-	|27|generic |STR_CHAR|   |  |  |  |     | 250|  |     |  |  |  |  |   | - a longer string that most kinds of data will fit in
+	|id|name    |base     |np |ns|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
+	|--|--------|---------|---|--|--|--|-----|----|--|-----|--|--|--|--|---|
+	| 1|bin1k   |STR_BIT  |   |  |  |  | 1000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 1000 octets
+	| 2|bin32k  |STR_BIT  |   |  |  |  |32000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 32000 octets
+	| 3|str4    |STR_CHAR |   |  |  |  |     |   4|1 |ASCII|1 |1 |20|1 |   | - a fix-w 4 char ascii cstr, uppercased, spc-pad
+	| 4|str10   |STR_CHAR |   |  |  |  |     |  10|1 |ASCII|1 |  |20|1 |   | - a fix-w 10 char ascii cstr, case-preserve, spc-pad
+	| 5|str30   |STR_CHAR |   |  |  |  |     |  30|  |ASCII|1 |  |  |  |   | - a fix-w 30 char ascii cstr, case-preserving
+	| 6|str2k   |STR_CHAR |   |  |  |  |     |2000|  |UTF8 |  |  |  |  |   | - a var-w 2000 char unicode cstr, case-preserving
+	| 7|byte    |NUM_INT  |   |  | 1|  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
+	| 8|short   |NUM_INT  |   |  | 2|  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
+	| 9|int     |NUM_INT  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
+	|10|long    |NUM_INT  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
+	|11|ubyte   |NUM_INT  |   |  | 1|1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
+	|12|ushort  |NUM_INT  |   |  | 2|1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
+	|13|uint    |NUM_INT  |   |  | 4|1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
+	|14|ulong   |NUM_INT  |   |  | 8|1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
+	|15|float   |NUM_APR  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit imprecise fractional number
+	|16|double  |NUM_APR  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit imprecise fractional number
+	|17|dec10p2 |NUM_EXA  | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths scale
+	|18|dec255  |NUM_EXA  |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary scale
+	|19|boolean |BOOLEAN  |   |  |  |  |     |    |  |     |  |  |  |  |   | - a boolean; only 2 values of false or true
+	|20|datetime|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |ABS| - a date and time or date, non-calendar specific
+	|21|dtchines|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |CHI| - a date and time or date, in the Chinese calendar
+	|22|sex     |STR_CHAR |   |  |  |  |     |   1|  |     |  |  |  |  |   | - a 1-char string, constrained to 'M' and 'F'
+	|23|str20   |STR_CHAR |   |  |  |  |     |  20|  |     |  |  |  |  |   | - a 20-char string
+	|24|str100  |STR_CHAR |   |  |  |  |     | 100|  |     |  |  |  |  |   | - a 100-char string
+	|25|str250  |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a 250-char string
+	|26|entitynm|STR_CHAR |   |  |  |  |     |  30|  |     |  |  |  |  |   | - a short string suitable for naming things
+	|27|generic |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a longer string that most kinds of data will fit in
 
 =head2 domain_opt
 
@@ -1344,9 +1382,10 @@ Unique Constraint List:
 =head2 sequence
 
 This type of Node describes a simple named sequence number generator, which
-will produce integers (normal purpose) but not fractional numbers.  Apparently
-sequence generators are not explicitly part of the SQL standard, but many
-database products have them.
+will produce integers (normal purpose) but not fractional numbers.  Sequence
+generators are part of the SQL-2003 standard (see "4.21 Sequence generators"),
+and many database products have them; apparently they are not part of older SQL
+standards.  The standard says that only integers can be produced by sequences.
 
 Attribute List:
 
@@ -1371,7 +1410,7 @@ This type of Node describes the core (single cardinality) description of a
 database table, which is the single core concept of any database; it is where
 the "data" that the database exists to store is kept.  Each table has one or
 more columns, which define its "interface", and one or more indexes or
-constraints for data integrity.
+constraints for data integrity.  SQL-2003,1999 calls this a "base table".
 
 Attribute List:
 
@@ -1539,6 +1578,11 @@ Attribute List:
 	on_delete - L.bool - MA - true when trigger should execute when a record delete is attempted
 	for_each_row - L.bool - MA - true when trigger is re-executed for each row affected; false is once
 
+	Note: The name of a trigger (as required by SQL-2003) is defined in the 
+	routine Node that implements the trigger body.
+
+	Note: SQL-2003 seems to suggest triggers can attach to tables or named views.
+
 	Note: It appears that triggers (in Oracle at least) can have names and a much more complicated 
 	condition as its "event"; it also can be attached to things other than tables.
 	It can also exist in a separate schema.  Keep that in mind for a future update.  
@@ -1573,6 +1617,20 @@ mass back-ups or restores of tables, or when implementing a utility that lets
 users make direct changes to a table.  Other part-way short cuts are available
 too.
 
+The view_join[/_col] Nodes that belong to a "view" ("viewed table") Node,
+together with the view_src[/_col] Nodes that the former reference, define the
+single (recursive) "joined table" (see SQL-2003 Foundations 7.7, p312) that is
+the basis for the "viewed table".  In the joined table, every field value
+matches exactly a (or several identical) value in a source table or view. 
+Given that SQL::SyntaxModel does not directly support the concept of a "natural
+join" (but it is indirectly supported), the number of columns in the joined
+table is always the sum of the number of columns in all the joined source
+table/views.  Also, the number of joined table rows is at most equal to the
+product of the number of rows in each source (and as few as zero).  The other 
+parts of a query build on the joined table.  The where/group/having/window 
+clauses can reduce (but never increase) the number of result rows.  The 
+select-list clause can change (to more or fewer) the number of result columns.
+
 Since the ability to change database records is more complicated than simply
 viewing records, and usually requires more information to be available (such as
 primary keys for rows being updated), SQL::SyntaxModel allows you to store a
@@ -1600,7 +1658,7 @@ Attribute List:
 	view_context - E.view_context - MA - what context this view expects to live in; eg: schema, cursor, application
 	view_type - E.view_type - MA - what kind of view this is; eg: match, single, mult, compound, has-subq, recursive
 	schema - N.schema - MC(view_context=SCHEMA) - the schema that this view is in, if any
-	name - L.cstr - MC(view_context=SCHEMA) - the name this view is identified by, if any
+	name - L.cstr - MC(view_context=SCHEMA|view_type=RECURSIVE) - the name this view is identified by, if any
 	application - N.application - MC(view_context=APPLIC) - if view in app space, not app routine, an app is our parent
 	routine - N.routine - MC(view_context=ROUTINE) - parent view of this one, if any; empty if this is the root view
 	p_view - N.view - MC(view_context=INSIDE) - parent view of this one, if any; empty if this is the root view
@@ -1921,6 +1979,8 @@ Attribute List:
 	view_arg - N.view_arg - MC(expr_type=VARG) - if the current view is a subquery, read value of an argument to it
 	routine_arg - N.routine_arg - MC(expr_type=ARG) - the current routine argument to read the value of
 	routine_var - N.routine_var - MC(expr_type=VAR) - the current routine variable to read the value of
+	domain - N.domain - MC(expr_type=CAST) - cast single child expression into this data type / domain
+	sequence - N.sequence - MC(expr_type=SEQN) - the sequence generator we will get the "next" value for
 	call_view - N.view - MC(expr_type=CVIEW) - the view/subquery we will invoke; subquery is child of cont view
 	call_view_arg - N.view_arg - if parent expr set call_view, name view arg that curr expr passes value to
 	call_sfunc - E.standard_func - MC(expr_type=SFUNC) - the standard built-in function we will invoke
@@ -2040,7 +2100,7 @@ Attribute List:
 	trigger - N.trigger - if this routine is the body for a trigger, it is our parent Node
 	application - N.application - if routine is in the application space, an app is our parent
 	p_routine - N.routine - parent routine of this one, if any; empty if this is the root routine
-	name - L.cstr - the name this routine is identified by in a schema or p_routine or application, if any
+	name - L.cstr - MA - name routine ident by in a [schema, p_routine, app], or name of trigger it impl
 	return_var_type - E.basic_var_type - if this routine returns a value, this is its variable type
 	return_domain - N.domain - if this routine returns a value, this is its domain
 
@@ -2130,6 +2190,8 @@ Attribute List:
 	lit_val - L.misc - MC(expr_type=LIT) - the literal value of this expression
 	src_arg - N.routine_arg - MC(expr_type=ARG) - the current routine argument to read the value of (or bind to if OUT arg)
 	src_var - N.routine_var - MC(expr_type=VAR) - the current routine variable to read the value of (or bind to if OUT arg)
+	domain - N.domain - MC(expr_type=CAST) - cast single child expression into this data type / domain
+	sequence - N.sequence - MC(expr_type=SEQN) - the sequence generator we will get the "next" value for
 	call_sfunc - E.standard_func - MC(expr_type=SFUNC) - the standard built-in function we will invoke
 	call_ufunc - N.routine - MC(expr_type=UFUNC) - the user-defined stored function we are calling
 	call_ufunc_arg - N.routine_arg - if parent set call_ufunc/uproc, name routine arg that curr expr passes value to
@@ -2484,10 +2546,10 @@ functionality like views or various DML operations know how to use the table.
 In its simplest sense, a Table object consists of a table name, a list of table
 columns, a list of keys, a list of constraints, and a few other implementation
 details.  This class does not describe anything that is changed by DML
-activity, such as a count of stored records, or the current values of sequences
-attached to columns.  This class would be used both when manipulating database
-schema and when manipulating database data.  This class can generate
-SQL::SyntaxModel::Command objects having types of: 'table_verify',
+activity, such as a count of stored records, or the current values of sequence
+generators attached to columns.  This class would be used both when
+manipulating database schema and when manipulating database data.  This class
+can generate SQL::SyntaxModel::Command objects having types of: 'table_verify',
 'table_create', 'table_alter', 'table_destroy'.
 
 B<SQL::SyntaxModel::View> - This Schema class describes a single database view,
