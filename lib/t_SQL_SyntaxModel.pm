@@ -36,8 +36,8 @@ sub create_and_populate_model {
 
 	##### FIRST SET ELEMENT-TYPE DETAILS #####
 
-	# As of SQL::SyntaxModel v0.18 there aren't any of these (but some may 
-	# come later); the 'domain' Nodes now appear under BLUEPRINT-TYPE DETAILS.
+	# As of SQL::SyntaxModel's 2004-05-12 release there aren't any of these (but some 
+	# may come later); the 'domain' Nodes now appear under BLUEPRINT-TYPE DETAILS.
 
 	##### NEXT SET CATALOG BLUEPRINT-TYPE DETAILS #####
 
@@ -135,13 +135,13 @@ sub create_and_populate_model {
 	my $cmd_install = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_install->set_literal_attribute( 'name', 'install_app_schema' );
 	$cmd_install->set_enumerated_attribute( 'command_type', 'DB_CREATE' );
-	$cmd_install->set_literal_attribute( 'command_arg', $catalog_bp->get_node_id() );
+	$cmd_install->set_node_ref_attribute( 'command_arg', $catalog_bp );
 
 	# Describe a command (pseudo-routine) for tearing down a database with our schema:
 	my $cmd_remove = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_remove->set_literal_attribute( 'name', 'remove_app_schema' );
 	$cmd_remove->set_enumerated_attribute( 'command_type', 'DB_DELETE' );
-	$cmd_remove->set_literal_attribute( 'command_arg', $catalog_bp->get_node_id() );
+	$cmd_remove->set_node_ref_attribute( 'command_arg', $catalog_bp );
 
 	# Describe a 'normal' application for viewing and editing database records:
 	my $editor_app = make_a_node( 'application', $model );

@@ -1,3 +1,32 @@
+2004-07-04   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.36.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.23).  Mainly this was to
+	update the 'command_type' enumerated value list and the 'command' Node
+	type. The 'command_arg' attribute of 'command' Nodes now has a major type
+	of 'node ref' rather than 'literal'; SQL::SyntaxModel now enforces that
+	'command_arg' is a valid Node, while before any integer was accepted, even
+	if it didn't match a Node.  It also enforces the correct type of Node, 
+	depending on what the 'command_type' is.
+
+	* Updated SQL::SyntaxModel to add support for a Node ref attribute to be
+	defined as flexible, accepting more than one type of Node for linking,
+	depending on circumstances.  Currently, said Node ref attribute can be
+	associated with an enumerated value attribute in the same Node, and be
+	constrained based on its value. Generally speaking, the module's
+	non-deferred input checks will allow a ref to (or id of) any type of Node
+	to be set as the flexible attribute's value; it is mainly during the
+	deferred input tests that the attribute will be constrained to exactly one
+	Node type, as it is only then that we can guarantee the enumerated value we
+	have to consult is also set.  These methods were updated to handle the new
+	data-driven feature: expected_node_ref_attribute_type(),
+	set_node_ref_attribute(), put_in_container(), test_mandatory_attributes();
+	also, a new private method _resolve_variable_node_ref_attribute_type() was
+	added.  Added three new messages to en.pm (now v0.08) for the new feature.  
+
+	* Other minor fixes and updates were made to code and documentation.
+
 2004-06-26   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.35.

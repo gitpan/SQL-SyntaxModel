@@ -248,13 +248,14 @@ purposes, they are part of your core application code and would get distributed
 as such; like your core application code, everyone's installation will be
 identical.  We keep simple and widely re-used details in 'elements'.  This used
 to include things such as column/variable data types or domains, but as of
-SQL::SyntaxModel v0.18 domains are under 'blueprints'.  We describe most
-structures in 'blueprints', including database tables (with constraints),
-arbitrarily complex database views, and various kinds of routines (such as
-stored procedures, user defined functions, and basic DML like selects, inserts,
-updates, deletes), both those stored in a database schema or in an application.
- We can represent multiple database catalogs and applications at once, whether
-or not they talk to each other; how they inter-relate is also represented.
+SQL::SyntaxModel's 2004-05-12 release, domains are under 'blueprints'.  We
+describe most structures in 'blueprints', including database tables (with
+constraints), arbitrarily complex database views, and various kinds of routines
+(such as stored procedures, user defined functions, and basic DML like selects,
+inserts, updates, deletes), both those stored in a database schema or in an
+application. We can represent multiple database catalogs and applications at
+once, whether or not they talk to each other; how they inter-relate is also
+represented.
 
 The second two categories, 'tools' and 'sites', are effectively locale or
 site-specific configuration data, and each installation of your application
@@ -959,115 +960,119 @@ There are several such context types, into which the Commands are grouped.  The
 result of executing a command often is a resource handle or something that
 provides a different context type for subsequent commands.
 
+Each 'command' Node takes one argument, which is another Node.  The valid Node
+type for that Node is different depending on what the command_type is.  The
+name of the Node type to use appears in parenthesis beside the command_type.
+
 I<According to SQL-1999, a transaction affects all types of SQL statements; if
 one is rolled back then it has no affect on SQL-schemas or SQL-data.  Or maybe 
 it isn't quite that simple; see section 4.8.5 of SQL-1999.>
 
 These commands must be called in a "void" context and do not return any context:
 
-	DB_LIST      - fetches a list of auto-detectable database instances
-	DB_INFO      - fetches some detailed info about a database instance
-	DB_VERIFY    - compares a provided db spec to an actual database
-	DB_CREATE    - creates a new database instance
-	DB_DELETE    - deletes a database instance
-	DB_CLONE     - makes a clone of a db instance in another storage loc
-	DB_MOVE      - moves a db inst from one storage location to another
+	DB_LIST(data_link_product) - fetches a list of auto-detectable database instances
+	DB_INFO(catalog)   - fetches some detailed info about a database instance
+	DB_VERIFY(catalog) - compares a provided db spec to an actual database
+	DB_CREATE(catalog) - creates a new database instance
+	DB_DELETE(catalog) - deletes a database instance
+	DB_CLONE(catalog)  - makes a clone of a db instance in another storage loc
+	DB_MOVE(catalog)   - moves a db inst from one storage location to another
 
 These commands must be called in a "void" context and return a "connection" context:
 
-	DB_OPEN      - opens a link or connection to a database instance from an application
+	DB_OPEN(catalog)   - opens a link or connection to a database instance from an application
 
 These commands must be called in a "connection" context and destroy that context:
 
-	DB_CLOSE     - closes a link or connection to a database instance from an application
+	DB_CLOSE(catalog)  - closes a link or connection to a database instance from an application
 
 These commands must be called in a "connection" context:
 
-	DB_PING      - verifies that a db connection is still open, that the db is accessible
-	DB_ATTACH    - attaches a link or connection to a database instance from another db instance
-	DB_DETACH    - detaches a link or connection to a database instance from another db instance
+	DB_PING(catalog)   - verifies that a db connection is still open, that the db is accessible
+	DB_ATTACH(catalog) - attaches a link or connection to a database instance from another db instance
+	DB_DETACH(catalog) - detaches a link or connection to a database instance from another db instance
 
 These commands must be called in a "connection" context and return a "transaction" context:
 
-	TRA_OPEN     - opens a "lightweight connection" or transactional context to a db from an app
+	TRA_OPEN(catalog)  - opens a "lightweight connection" or transactional context to a db from an app
 
 These commands must be called in a "transaction" context and destroy that context:
 
-	TRA_CLOSE    - closes a "lightweight connection" or transactional context to a db from an app
+	TRA_CLOSE(catalog) - closes a "lightweight connection" or transactional context to a db from an app
 
 These commands must be called in a "transaction" context:
 
-	SCHEMA_LIST   - fetches a list of schemas of open db instance
-	SCHEMA_INFO   - fetches some detailed info about a schemas
-	SCHEMA_VERIFY - compares a provided schema spec to an actual schemas
-	SCHEMA_CREATE - creates a new schema in catalog of open db inst
-	SCHEMA_DELETE - deletes an existing schema in open db inst (if it can)
-	SCHEMA_CLONE  - creates a clone of an existing schema with different name
-	SCHEMA_UPDATE - alters details for an existing schema
-	DOMAIN_LIST   - fetches a list of domains of open db instance
-	DOMAIN_INFO   - fetches some detailed info about a domain
-	DOMAIN_VERIFY - compares a provided domain spec to an actual domain
-	DOMAIN_CREATE - creates a new domain in schema of open db inst
-	DOMAIN_DELETE - deletes an existing domain in open db inst (if it can)
-	DOMAIN_CLONE  - creates a clone of an existing domain with different name
-	DOMAIN_UPDATE - alters details for an existing domain
-	SEQU_LIST    - fetches a list of sequence generators in schema of open db instance
-	SEQU_INFO    - fetches some detailed info about a sequence
-	SEQU_VERIFY  - compares a provided sequence generator spec to an actual table
-	SEQU_CREATE  - creates a new sequence generator in schema of open db inst
-	SEQU_DELETE  - deletes an existing sequence generator in open db inst (if it can)
-	SEQU_CLONE   - creates a clone of an existing sequence with different name
-	SEQU_UPDATE  - alters details for an existing sequence generator
-	TABLE_LIST   - fetches a list of tables in schema of open db instance
-	TABLE_INFO   - fetches some detailed info about a table
-	TABLE_VERIFY - compares a provided table spec to an actual table
-	TABLE_CREATE - creates a new table in schema of open db inst
-	TABLE_DELETE - deletes an existing table in open db inst (if it can)
-	TABLE_CLONE  - creates a clone of an existing table with different name
-	TABLE_UPDATE - alters details for an existing table
-	VIEW_LIST    - fetches a list of views in schema of open db instance
-	VIEW_INFO    - fetches some detailed info about a view
-	VIEW_VERIFY  - compares a provided view spec to an actual view
-	VIEW_CREATE  - creates a new view in schema of open db inst
-	VIEW_DELETE  - deletes an existing view in open db inst (if it can)
-	VIEW_CLONE   - creates a clone of an existing view with different name
-	VIEW_UPDATE  - alters details for an existing view
-	ROUTINE_LIST   - fetches a list of routines/procs/funcs of open db instance
-	ROUTINE_INFO   - fetches some detailed info about a routine
-	ROUTINE_VERIFY - compares a provided routine spec to an actual routine
-	ROUTINE_CREATE - creates a new routine in schema of open db inst
-	ROUTINE_DELETE - deletes an existing routine in open db inst (if it can)
-	ROUTINE_CLONE  - creates a clone of an existing routine with different name
-	ROUTINE_UPDATE - alters details for an existing routine
-	USER_LIST    - fetches a list of users in open db instance
-	USER_INFO    - fetches some detailed info about a database user
-	USER_VERIFY  - compares a provided user spec to an actual user
-	USER_CREATE  - creates new db user one can auth DB_OPEN with (if privs)
-	USER_DELETE  - deletes db user (as well as all schema it owns, if applic)
-	USER_CLONE   - creates a clone of an existing user with different name
-	USER_UPDATE  - alters some details for a database user
-	USER_GRANT   - grants a db privilege to a db user
-	USER_REVOKE  - revokes a db privilege from a db user
+	SCHEMA_LIST(catalog)  - fetches a list of schemas of open db instance
+	SCHEMA_INFO(schema)   - fetches some detailed info about a schemas
+	SCHEMA_VERIFY(schema) - compares a provided schema spec to an actual schemas
+	SCHEMA_CREATE(schema) - creates a new schema in catalog of open db inst
+	SCHEMA_DELETE(schema) - deletes an existing schema in open db inst (if it can)
+	SCHEMA_CLONE(schema)  - creates a clone of an existing schema with different name
+	SCHEMA_UPDATE(schema) - alters details for an existing schema
+	DOMAIN_LIST(schema)   - fetches a list of domains of open db instance
+	DOMAIN_INFO(domain)   - fetches some detailed info about a domain
+	DOMAIN_VERIFY(domain) - compares a provided domain spec to an actual domain
+	DOMAIN_CREATE(domain) - creates a new domain in schema of open db inst
+	DOMAIN_DELETE(domain) - deletes an existing domain in open db inst (if it can)
+	DOMAIN_CLONE(domain)  - creates a clone of an existing domain with different name
+	DOMAIN_UPDATE(domain) - alters details for an existing domain
+	SEQU_LIST(schema)     - fetches a list of sequence generators in schema of open db instance
+	SEQU_INFO(sequence)   - fetches some detailed info about a sequence
+	SEQU_VERIFY(sequence) - compares a provided sequence generator spec to an actual table
+	SEQU_CREATE(sequence) - creates a new sequence generator in schema of open db inst
+	SEQU_DELETE(sequence) - deletes an existing sequence generator in open db inst (if it can)
+	SEQU_CLONE(sequence)  - creates a clone of an existing sequence with different name
+	SEQU_UPDATE(sequence) - alters details for an existing sequence generator
+	TABLE_LIST(schema)  - fetches a list of tables in schema of open db instance
+	TABLE_INFO(table)   - fetches some detailed info about a table
+	TABLE_VERIFY(table) - compares a provided table spec to an actual table
+	TABLE_CREATE(table) - creates a new table in schema of open db inst
+	TABLE_DELETE(table) - deletes an existing table in open db inst (if it can)
+	TABLE_CLONE(table)  - creates a clone of an existing table with different name
+	TABLE_UPDATE(table) - alters details for an existing table
+	VIEW_LIST(schema) - fetches a list of views in schema of open db instance
+	VIEW_INFO(view)   - fetches some detailed info about a view
+	VIEW_VERIFY(view) - compares a provided view spec to an actual view
+	VIEW_CREATE(view) - creates a new view in schema of open db inst
+	VIEW_DELETE(view) - deletes an existing view in open db inst (if it can)
+	VIEW_CLONE(view)  - creates a clone of an existing view with different name
+	VIEW_UPDATE(view) - alters details for an existing view
+	ROUTINE_LIST(schema)    - fetches a list of routines/procs/funcs of open db instance
+	ROUTINE_INFO(routine)   - fetches some detailed info about a routine
+	ROUTINE_VERIFY(routine) - compares a provided routine spec to an actual routine
+	ROUTINE_CREATE(routine) - creates a new routine in schema of open db inst
+	ROUTINE_DELETE(routine) - deletes an existing routine in open db inst (if it can)
+	ROUTINE_CLONE(routine)  - creates a clone of an existing routine with different name
+	ROUTINE_UPDATE(routine) - alters details for an existing routine
+	USER_LIST(catalog) - fetches a list of users in open db instance
+	USER_INFO(user)    - fetches some detailed info about a database user
+	USER_VERIFY(user)  - compares a provided user spec to an actual user
+	USER_CREATE(user)  - creates new db user one can auth DB_OPEN with (if privs)
+	USER_DELETE(user)  - deletes db user (as well as all schema it owns, if applic)
+	USER_CLONE(user)   - creates a clone of an existing user with different name
+	USER_UPDATE(user)  - alters some details for a database user
+	USER_GRANT(user)   - grants a db privilege to a db user
+	USER_REVOKE(user)  - revokes a db privilege from a db user
 
 These commands must be called in a "transaction" context and return a "cursor" context:
 
-	REC_FETCH    - fetches records from a table or view of multiple tables
+	REC_FETCH(view)   - fetches records from a table or view of multiple tables
 
 These commands must be called in a "transaction" context:
 
-	REC_VERIFY   - compares a provided set of records to stored ones
-	REC_INSERT   - inserts new recs into a table or view of multiple tables
-	REC_UPDATE   - updates exist recs in a table or view of multiple tables
-	REC_DELETE   - deletes exist recs from a table or view of multiple tables
-	REC_REPLACE  - either updates or inserts recs if they exist or not
-	REC_CLONE    - creates a clone of a record in same table/view (if possible)
-	REC_LOCK     - places a lock on recs for a consistant read plus update
-	REC_UNLOCK   - releases an existing lock on recs
+	REC_VERIFY(view)  - compares a provided set of records to stored ones
+	REC_INSERT(view)  - inserts new recs into a table or view of multiple tables
+	REC_UPDATE(view)  - updates exist recs in a table or view of multiple tables
+	REC_DELETE(view)  - deletes exist recs from a table or view of multiple tables
+	REC_REPLACE(view) - either updates or inserts recs if they exist or not
+	REC_CLONE(view)   - creates a clone of a record in same table/view (if possible)
+	REC_LOCK(view)    - places a lock on recs for a consistant read plus update
+	REC_UNLOCK(view)  - releases an existing lock on recs
 
 These commands must be called in a "transaction" or "connection" context, maybe more:
 
-	CALL_PROC    - calls a stored procedure to do some predefined task
-	CALL_FUNC    - calls a stored function to do some predefined task
+	CALL_PROC(routine) - calls a stored procedure to do some predefined task
+	CALL_FUNC(routine) - calls a stored function to do some predefined task
 
 These are the basic types of Results that can be returned from executing a
 SQL::SyntaxModel command against a database or other Result context.
@@ -1096,7 +1101,10 @@ described by one (possibly 'wrapped') line, in this format:
 In the above usage, the major-type is shortened from its full name like this:
 "literal" -> "L", "enumerated" -> "E", "node_ref" -> "N".  When the major-type
 is "node_id", then "NODE_ID" appears in place of the combined major and minor
-types on the line.
+types on the line.  As a special case, when a major type is "node_ref" and the
+minor type may conditionally be any Node type, then a "CCE(foo)" appears for
+the "<minor-type>" where "foo" is the name of an enumerated attribute in the
+same Node whose value is looked up to determine what Node type to use.
 
 The parent-flag indicates whether the attribute can be used to link the current
 Node to a "primary parent" Node.  When a Container (or subset of its Nodes) is
@@ -1126,12 +1134,13 @@ is the table's 'identifier'.
 
 I<Many of the Node Type explanations come with a list of example Nodes,
 formatted like a table, one row per Node, one column per attribute.  Starting
-with SQL::SyntaxModel version 0.10, the order that the Nodes appear in is
+with SQL::SyntaxModel as of 2004-02-04, the order that the Nodes appear in is
 significant; previously it wasn't, since there were extra attributes (removed
-in 0.10) which stored important sequence numbers.  If these same Nodes were
-stored in an RDBMS, then extra columns may need to be added to remember their
-sequence, which an RDBMS does not natively do.  Whereas, if the Nodes were
-stored in XML format, you won't need to add anything, as XML preserves order.>
+as of 2004-02-04) which stored important sequence numbers.  If these same Nodes
+were stored in an RDBMS, then extra columns may need to be added to remember
+their sequence, which an RDBMS does not natively do.  Whereas, if the Nodes
+were stored in XML format, you won't need to add anything, as XML preserves
+order.>
 
 =head2 catalog
 
@@ -1707,7 +1716,7 @@ Attribute List:
 	application - N.application - PP - if view in app space, not app routine, an app is our parent
 	routine - N.routine - PP - parent view of this one, if any; empty if this is the root view
 	p_view - N.view - PP - parent view of this one, if any; empty if this is the root view
-	match_all_cols - L.bool - use with view_type=MATCH; if true, this view matches every col; if false, view_col has list
+	match_all_cols - L.bool - use with view_type=MATCH; if true, this view matches every col (like '*'); if false, view_col has list
 	compound_op - E.compound_operator - MCEE(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
 	distinct_rows - L.bool - (set quantifier) true, select|compound returns distinct rows; false, return all rows
 	may_write - L.bool - true when we should at least try allowing updates through the view
@@ -2296,7 +2305,10 @@ Attribute List:
 	application - N.application - PP - MA - what application this Command belongs to
 	name - L.cstr - the name this command (pseudo-routine) is identified by in an application, if any
 	command_type - E.command_type - MA - what SQL::SyntaxModel recognized command to run
-	command_arg - L.uint - MA - the Node ID of the argument to the above command
+	command_arg - N.CCE(command_type) - MA - an argument to the above command
+
+	Note: See the 'command_type' enumerated list documentation to see 
+	what Node type it expects for its command argument.
 
 Unique Constraint List:
 
@@ -2599,17 +2611,17 @@ Unique Constraint List:
 These paragraphs were more or less the original documentation for high-level
 SQL::SyntaxModel concepts, back when each concept was planned to be a separate
 class of its own.  They were originally published in Framework.pod since the
-first release of the Rosetta distribution, and up until release 0.22 inclusive.
- They are here in Language.pod as of release 0.23.  Some details you see here
-shouldn't be considered accurate.
+first release of the Rosetta distribution (2003-01-05), and up until 2004-02-04
+inclusive. They are here in Language.pod as of 2004-02-12.  Some details you
+see here shouldn't be considered accurate.
 
-B<SQL::SyntaxModel::Command> - This Schema class describes an action that needs
+B<SQL::SyntaxModel::Command> - This Model class describes an action that needs
 to be done against a database; the action may include several steps, and all of
 them must be done when executing the Command.  A Command object has one
 mandatory string property named 'type' (eg: 'database_open', 'table_create',
 'data_insert'), which sets the context for all of its other properties, which
 are in a hash property named 'args'.  Elements of 'args' often include other
-Schema class objects like 'Table' or 'DataType'.  Like all Schema objects, this
+Model class objects like 'Table' or 'DataType'.  Like all Model objects, this
 is static and context-independant; it is intended to be serialized and passed
 to code like DBI->prepare().   While bind vars are often used with them (such
 as values to insert or update, or record matching conditions), it is always up
@@ -2617,14 +2629,14 @@ to the calling code to resolve the bind vars such as with a user prompt (as
 SQL*Plus does), and pass those to code like DBI->execute().  I<See also
 Rosetta::Command.>
 
-B<SQL::SyntaxModel::DataType> - This Schema class describes a simple data type,
+B<SQL::SyntaxModel::DataType> - This Model class describes a simple data type,
 which serves as metadata for a single atomic or scalar unit of data, or a
 column whose members are all of the same data type, such as in a regular
 database table or in row sets read from or to be written to one.  This class
 would be used both when manipulating database schema and when manipulating
 database data.
 
-B<SQL::SyntaxModel::Table> - This Schema class describes a single database
+B<SQL::SyntaxModel::Table> - This Model class describes a single database
 table, and would be used for such things as managing schema for the table (eg:
 create, alter, destroy), and describing the table's "public interface" so other
 functionality like views or various DML operations know how to use the table.
@@ -2637,7 +2649,7 @@ manipulating database schema and when manipulating database data.  This class
 can generate SQL::SyntaxModel::Command objects having types of: 'table_verify',
 'table_create', 'table_alter', 'table_destroy'.
 
-B<SQL::SyntaxModel::View> - This Schema class describes a single database view,
+B<SQL::SyntaxModel::View> - This Model class describes a single database view,
 which conceptually looks like a table, but it is used differently.  Tables and
 views are similar in that they both represent or store a matrix of data, which
 has uniquely identifiable columns, and rows which can be uniquely identifiable

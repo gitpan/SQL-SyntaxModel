@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.22';
+$VERSION = '0.23';
 
 use Locale::KeyedText 0.04;
 
@@ -242,8 +242,17 @@ my $TPI_AT_LITERALS  = 'at_literals'; # Keys are attr names a Node can have whic
 my $TPI_AT_ENUMS     = 'at_enums'; # Keys are attr names a Node can have which are enumerated values
 	# Values are enums and match a %ENUMERATED_TYPES key
 my $TPI_AT_NREFS     = 'at_nrefs'; # Keys are attr names a Node can have which are Node Ref/Id values
-	# Values are enums and match a %NODE_TYPES key
-my $TPI_P_NODE_ATNMS = 'p_node_atnms'; # Keys match keys of AT_NODES (P_NODE_ATNM is a list subset)
+	# Values are enums and each matches a single %NODE_TYPES key.
+	# Exception: If value is array ref, then any %NODE_TYPES key may be matched initially; 
+	# during the deferred validation procedure, this value is checked on a per-Node basis 
+	# and must be found to match a single %NODE_TYPES key based on a separate lookup result;
+	# if that array's first/only element is 'CCE', then the separate lookup is done in AT_NREFS_CCE.
+my $TPI_AT_NREFS_CCE = 'at_nrefs_cce'; # Keys match keys of AT_NREFS, values are array refs
+	# First array element matches an AT_ENUMS key whose value in the same Node we 
+	# are to look up.  Second array element is a hash ref whose keys match possible 
+	# results of the first lookup; that hash ref's values are Node types; 
+	# the second match determines what Node type the corresponding AT_NREFS should be.
+my $TPI_P_NODE_ATNMS = 'p_node_atnms'; # Keys match keys of AT_NREFS (P_NODE_ATNMS is a list subset)
 	# Values are meaningless; they simply are the truth value of 1
 my $TPI_P_PSEUDONODE = 'p_pseudonode'; # If set, Nodes of this type have a hard-coded pseudo-parent
 my $TPI_R_P_NODE_ATNM = 'r_p_node_atnm'; # If this Node type can form a tree because they 
@@ -263,6 +272,10 @@ my $TPI_MCEE_LITERALS = 'mcee_literals'; # key is MC atnm, val=array of conditio
 	# the attribute which is MC is mandatory if any condition-pair is true.
 my $TPI_MCEE_ENUMS    = 'mcee_enums'; # see previous
 my $TPI_MCEE_NREFS    = 'mcee_nrefs'; # see previous
+
+# Special flags that may be used in $TPI_AT_NREFS elements go here:
+my $VAR_AT_NREFS_CCE = 'CCE'; # If used, the valid Node type for this Node ref 
+	# attribute is determined by the value of an associated enumerated attribute.
 
 # Names of special "pseudo-nodes" that are used in an XML version of this structure.
 my $SQLSM_L1_ROOT_PSND = 'root';
@@ -911,18 +924,97 @@ my %NODE_TYPES = (
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
-			'command_arg' => 'uint',
 		},
 		$TPI_AT_ENUMS => {
 			'command_type' => 'command_type',
 		},
 		$TPI_AT_NREFS => {
 			'application' => 'application',
+			'command_arg' => [$VAR_AT_NREFS_CCE],
+		},
+		$TPI_AT_NREFS_CCE => {
+			'command_arg' => ['command_type', {qw(
+				DB_LIST   data_link_product
+				DB_INFO   catalog
+				DB_VERIFY catalog
+				DB_CREATE catalog
+				DB_DELETE catalog
+				DB_CLONE  catalog
+				DB_MOVE   catalog
+				DB_OPEN   catalog
+				DB_CLOSE  catalog
+				DB_PING   catalog
+				DB_ATTACH catalog
+				DB_DETACH catalog
+				TRA_OPEN  catalog
+				TRA_CLOSE catalog
+				SCHEMA_LIST   catalog
+				SCHEMA_INFO   schema
+				SCHEMA_VERIFY schema
+				SCHEMA_CREATE schema
+				SCHEMA_DELETE schema
+				SCHEMA_CLONE  schema
+				SCHEMA_UPDATE schema
+				DOMAIN_LIST   schema
+				DOMAIN_INFO   domain
+				DOMAIN_VERIFY domain
+				DOMAIN_CREATE domain
+				DOMAIN_DELETE domain
+				DOMAIN_CLONE  domain
+				DOMAIN_UPDATE domain
+				SEQU_LIST   schema
+				SEQU_INFO   sequence
+				SEQU_VERIFY sequence
+				SEQU_CREATE sequence
+				SEQU_DELETE sequence
+				SEQU_CLONE  sequence
+				SEQU_UPDATE sequence
+				TABLE_LIST   schema
+				TABLE_INFO   table
+				TABLE_VERIFY table
+				TABLE_CREATE table
+				TABLE_DELETE table
+				TABLE_CLONE  table
+				TABLE_UPDATE table
+				VIEW_LIST   schema
+				VIEW_INFO   view
+				VIEW_VERIFY view
+				VIEW_CREATE view
+				VIEW_DELETE view
+				VIEW_CLONE  view
+				VIEW_UPDATE view
+				ROUTINE_LIST   schema
+				ROUTINE_INFO   routine
+				ROUTINE_VERIFY routine
+				ROUTINE_CREATE routine
+				ROUTINE_DELETE routine
+				ROUTINE_CLONE  routine
+				ROUTINE_UPDATE routine
+				USER_LIST   catalog_instance
+				USER_INFO   user
+				USER_VERIFY user
+				USER_CREATE user
+				USER_DELETE user
+				USER_CLONE  user
+				USER_UPDATE user
+				USER_GRANT  user
+				USER_REVOKE user
+				REC_FETCH   view
+				REC_VERIFY  view
+				REC_INSERT  view
+				REC_UPDATE  view
+				REC_DELETE  view
+				REC_REPLACE view
+				REC_CLONE   view
+				REC_LOCK    view
+				REC_UNLOCK  view
+				CALL_PROC routine
+				CALL_FUNC routine
+			)}],
 		},
 		$TPI_P_NODE_ATNMS => [qw( application )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( command_arg )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( command_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application )},
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application command_arg )},
 	},
 	'data_storage_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1659,6 +1751,7 @@ sub expected_node_ref_attribute_type {
 		$node->_throw_error_message( 'SSM_N_EXP_NREF_AT_INVAL_NM', 
 			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
 	}
+	ref($exp_node_type) eq 'ARRAY' and $exp_node_type = [@{$exp_node_type}];
 	return( $exp_node_type );
 }
 
@@ -1683,6 +1776,24 @@ sub clear_node_ref_attributes {
 	foreach my $attr_name (sort keys %{$node->{$NPROP_AT_NREFS}}) {
 		$node->_clear_node_ref_attribute( $attr_name );
 	}
+}
+
+sub _resolve_variable_node_ref_attribute_type {
+	my ($node, $attr_name, $exp_node_type, $error_key_pfx) = @_;
+	my $node_type_info = $NODE_TYPES{$node->{$NPROP_NODE_TYPE}};
+	my ($special_case_type) = @{$exp_node_type};
+	if( $special_case_type eq $VAR_AT_NREFS_CCE ) {
+		# Expected Node type determined by a related enumerated attribute value.
+		my ($lookup_atnm, $rh_vals_to_ntypes) = @{$node_type_info->{$TPI_AT_NREFS_CCE}->{$attr_name}};
+		my $lookup_val = $node->{$NPROP_AT_ENUMS}->{$lookup_atnm};
+		unless( $lookup_val ) {
+			$node->_throw_error_message( $error_key_pfx.'_CCE_NO_LOOKUP_VAL', 
+				{ 'NAME' => $attr_name, 'LOOKUP' => $lookup_atnm } );
+		}
+		# Assume we are internally correct; if we get here, a hash value exists.
+		return( $rh_vals_to_ntypes->{$lookup_val} );
+	}
+	# Assume we can not have any other special case types.
 }
 
 sub _clear_node_ref_attribute {
@@ -1711,9 +1822,11 @@ sub set_node_ref_attribute {
 		# We were given a Node object for a new attribute value.
 
 		unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-			$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', 
-				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
-				'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE} } );
+			unless( ref($exp_node_type) eq 'ARRAY' ) { # An ary ref means let all Node types in.
+				$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', 
+					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
+					'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE} } );
+			}
 		}
 
 		if( $attr_value->{$NPROP_CONTAINER} and $node->{$NPROP_CONTAINER} ) {
@@ -1739,11 +1852,15 @@ sub set_node_ref_attribute {
 		}
 
 		if( my $container = $node->{$NPROP_CONTAINER} ) {
-			$attr_value = $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value};
-			unless( $attr_value ) {
+			if( ref($exp_node_type) eq 'ARRAY' ) { # An ary ref means type is conditional.
+				$exp_node_type = $node->_resolve_variable_node_ref_attribute_type( 
+					$attr_name, $exp_node_type, 'SSM_N_SET_NREF_AT' );
+			}
+			unless( $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value} ) {
 				$node->_throw_error_message( 'SSM_N_SET_NREF_AT_NONEX_NID', 
 					{ 'ARG' => $attr_value, 'EXPTYPE' => $exp_node_type } );
 			}
+			$attr_value = $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value};
 		}
 	}
 
@@ -1997,6 +2114,10 @@ sub put_in_container {
 		# Note that if $tpi_at_nodes is undefined, expect that this foreach loop will not run
 		my $at_nodes_nid = $rh_at_nodes_nids->{$at_nodes_atnm};
 		my $at_node_type = $tpi_at_nodes->{$at_nodes_atnm};
+		if( ref($at_node_type) eq 'ARRAY' ) { # An ary ref means type is conditional.
+			$at_node_type = $node->_resolve_variable_node_ref_attribute_type( 
+				$at_nodes_atnm, $at_node_type, 'SSM_N_PI_CONT' );
+		}
 		my $at_nodes_ref = $rh_cnl_bt->{$at_node_type}->{$at_nodes_nid};
 		unless( $at_nodes_ref ) {
 			$node->_throw_error_message( 'SSM_N_PI_CONT_NONEX_AT_NODE', 
@@ -2348,6 +2469,28 @@ sub test_mandatory_attributes {
 							'CHECKNM' => $attr_to_check, 'CHECKVL' => $val_to_check } );
 					}
 				}
+			}
+		}
+	}
+
+	# Now test that Node ref attributes whose expected Node types can be variable 
+	# based on other Node attributes have the correct correspondence.
+
+	if( my $variable_attrs = $type_info->{$TPI_AT_NREFS_CCE} ) {
+		my $at_enums = $node->{$NPROP_AT_ENUMS};
+		my $at_nrefs = $node->{$NPROP_AT_NREFS};
+		foreach my $attr_name (keys %{$variable_attrs}) {
+			my ($lookup_atnm, $rh_vals_to_ntypes) = @{$variable_attrs->{$attr_name}};
+			my $lookup_val = $at_enums->{$lookup_atnm}; 
+			# We assume the enum value we have to look at is set since if it wasn't 
+			# then one of the mandatory value checks above would have caught it.
+			my $exp_node_type = $rh_vals_to_ntypes->{$lookup_val};
+			my $attr_value = $at_nrefs->{$attr_name};
+			unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
+				$node->_throw_error_message( 'SSM_N_TEMA_ATS_CCE_WRONG_NREF_NODE_TYPE', 
+					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
+					'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
+					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
 			}
 		}
 	}
@@ -2931,11 +3074,11 @@ Node is a child of the first.  The order of child Nodes under a parent is the
 same as that in which the parent-child relationship was assigned, unless you 
 have afterwards used the move_before_sibling() method to change this.
 
-I<In versions of SQL::SyntaxModel prior to 0.10, some Node types also had
-explicit 'order' attributes so that if each Node was converted as-is to an
-RDBMS record, it would be possible to retrieve the records in the same
-sequence; this was useful in cases where the order of Nodes was important.
-These redundant 'order' attributes were eliminated in version 0.10 since their
+I<In versions of SQL::SyntaxModel prior to the 2004-02-04 release, some Node
+types also had explicit 'order' attributes so that if each Node was converted
+as-is to an RDBMS record, it would be possible to retrieve the records in the
+same sequence; this was useful in cases where the order of Nodes was important.
+These redundant 'order' attributes were eliminated as of 2004-02-04 since their
 maintenance was making this module more difficult to use.  As a consequence,
 you will now have to add a column yourself to maintain the sort order when
 converting Nodes to RDBMS records.>
@@ -3779,12 +3922,13 @@ All SQL::SyntaxModel::Container objects contain circular references by design
 (or more specifically, when 1 or more Node is in one).  When you are done with
 a Container object, you should explicitly call its "destroy()" method prior to
 letting your references to it go out of scope, or you will leak the memory it
-used.  I<Up to and including SQL::SyntaxModel v0.12 I had implemented a cludge
-that wrapped the actual Container object in a second object that would
-automatically destroy its contents when it went out of scope.  While that saved
-users from doing manual destruction, it introduced potentially worse problems,
-such as the Container being destroyed too early (and it added complexity
-regardless); as of v0.13 I did away with the cludge.>
+used.  I<Up to and including SQL::SyntaxModel's 2004-03-03 release I had
+implemented a cludge that wrapped the actual Container object in a second
+object that would automatically destroy its contents when it went out of scope.
+ While that saved users from doing manual destruction, it introduced
+potentially worse problems, such as the Container being destroyed too early
+(and it added complexity regardless); as of 2004-03-08 I did away with the
+cludge.>
 
 =head1 SEE ALSO
 

@@ -6,8 +6,8 @@
 BEGIN { $| = 1; print "1..6\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use t_SQL_SyntaxModel;
-use SQL::SyntaxModel 0.22;
-use SQL::SyntaxModel::L::en 0.07;
+use SQL::SyntaxModel 0.23;
+use SQL::SyntaxModel::L::en 0.08;
 $loaded = 1;
 print "ok 1\n";
 use strict;
