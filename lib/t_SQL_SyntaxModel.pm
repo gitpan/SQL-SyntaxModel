@@ -135,13 +135,15 @@ sub create_and_populate_model {
 	my $cmd_install = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_install->set_literal_attribute( 'name', 'install_app_schema' );
 	$cmd_install->set_enumerated_attribute( 'command_type', 'DB_CREATE' );
-	$cmd_install->set_node_ref_attribute( 'command_arg_1', $setup_app_cl );
+	my $cmd_install_a1 = make_a_child_node( 'command_arg', $cmd_install, 'command' );
+	$cmd_install_a1->set_node_ref_attribute( 'catalog_link', $setup_app_cl );
 
 	# Describe a command (pseudo-routine) for tearing down a database with our schema:
 	my $cmd_remove = make_a_child_node( 'command', $setup_app, 'application' );
 	$cmd_remove->set_literal_attribute( 'name', 'remove_app_schema' );
 	$cmd_remove->set_enumerated_attribute( 'command_type', 'DB_DELETE' );
-	$cmd_remove->set_node_ref_attribute( 'command_arg_1', $setup_app_cl );
+	my $cmd_remove_a1 = make_a_child_node( 'command_arg', $cmd_remove, 'command' );
+	$cmd_remove_a1->set_node_ref_attribute( 'catalog_link', $setup_app_cl );
 
 	# Describe a 'normal' application for viewing and editing database records:
 	my $editor_app = make_a_node( 'application', $model );
@@ -479,8 +481,12 @@ sub expected_model_xml_output {
 		</catalog>
 		<application id="1" name="Setup">
 			<catalog_link id="1" application="1" name="admin_link" target="1" />
-			<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg_1="1" />
-			<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg_1="1" />
+			<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE">
+				<command_arg id="1" command="1" catalog_link="1" />
+			</command>
+			<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE">
+				<command_arg id="2" command="2" catalog_link="1" />
+			</command>
 		</application>
 		<application id="2" name="People Watcher">
 			<catalog_link id="2" application="2" name="editor_link" target="1" />

@@ -175,8 +175,8 @@ this document goes into more detail on them):
 	- create/alter/delete catalogs, schemas, users
 	- cursors
 	- multiple row insert / "write cursors"
-	- application bind variables for any data type
-	- all bind variables are named (rather than positional)
+	- application host parameters for any data type
+	- all host parameters are named (rather than positional)
 	- explicit transactions and nested transactions (and savepoints?)
 	- record locking for read and locking for write
 	- throwing exceptions
@@ -211,7 +211,7 @@ model, where every intersection of a column and a row in a table or view is an
 atomic value.  Anything which breaks from this mold is currently not supported.  
 This said, transient data such as variables in routines (stored procedures) can 
 and often are more complex types like arrays or records or references; likewise 
-input and output values of routines, and bind variables, can be complex types.
+input and output values of routines, and host parameters, can be complex types.
 
 =head1 CIRCUMVENTING FEATURE LIMITATIONS
 
@@ -323,7 +323,9 @@ another of the same type (eg: a sub-query or sub-routine).
 				<catalog_link c="M" />
 				<view c="M" r="Y" />
 				<routine c="M" r="Y" />
-				<command c="M" />
+				<command c="M">
+					<command_arg c="M" />
+				</command>
 			</application>
 		</blueprints>
 		<tools>
@@ -402,7 +404,7 @@ The SQL::SyntaxModel language is designed with an embedded SQL paradigm in
 mind, where all SQL can be invoked as if it was written in the same language as
 the program code which invokes it.  The SQL can take arguments like a normal
 program routine, and it can hand return values like a normal program routine; 
-either of those can be considered named bind variables.
+either of those can be considered named host parameters.
 
 The SQL::SyntaxModel language is designed so that you would do B<all> types of
 database interaction with it; not only would you use SQL to issue typical DML
@@ -437,12 +439,12 @@ with "commands" for now.>
 
 In practice, the way of providing arguments to named database stored routines
 can be different from a way passing arguments to un-named routines or queries
-constructed on a client application; the latter often uses 'bind variables' for
+constructed on a client application; the latter often uses 'host parameters' for
 sending or receiving data, while the former uses named routine arguments and/or
 has an explicit return value.  The SQL::SyntaxModel language unifies these
 concepts and makes it as if all SQL statements take named arguments, and
 "return" a value; in database stored procedures, this is the same as usual; on
-the client side, the named arguments each correspond to a named bind variable.
+the client side, the named arguments each correspond to a named host parameter.
 
 Similarly, all SQL "select" queries are treated as cursors; on the database
 side this is the same as usual; on the application/client side, this may or may
@@ -1111,10 +1113,7 @@ described by one (possibly 'wrapped') line, in this format:
 In the above usage, the major-type is shortened from its full name like this:
 "literal" -> "L", "enumerated" -> "E", "node_ref" -> "N".  When the major-type
 is "node_id", then "NODE_ID" appears in place of the combined major and minor
-types on the line.  As a special case, when a major type is "node_ref" and the
-minor type may conditionally be any Node type, then a "CCE(foo)" appears for
-the "<minor-type>" where "foo" is the name of an enumerated attribute in the
-same Node whose value is looked up to determine what Node type to use.
+types on the line.
 
 The parent-flag indicates whether the attribute can be used to link the current
 Node to a "primary parent" Node.  When a Container (or subset of its Nodes) is
@@ -1136,9 +1135,7 @@ flag of "MCR(foo)" only applies to Node types that can have parent Nodes of the
 same type, arranged in a tree; the attribute named in the parenthesis is null
 if the current Node is a root of its tree (could be of one element), and it is
 set when it is not a root; an MCR attribute must be set when the Node is a
-root, and it must not be set when the Node is not a root.  Note that all
-attributes having an attribute type of "N.CCE" will also have an implicit
-dependant conditionally mandatory status.
+root, and it must not be set when the Node is not a root.
 
 Note that for for any Node Type that has an attribute of 'name', that attribute
 is often one and the same thing as the 'identifier' in SQL; eg, a table 'name'
@@ -2320,13 +2317,28 @@ Attribute List:
 	application - N.application - PP - MA - what application this Command belongs to
 	name - L.cstr - the name this command (pseudo-routine) is identified by in an application, if any
 	command_type - E.command_type - MA - what SQL::SyntaxModel recognized command to run
-	command_arg_1 - N.CCE(command_type) - an argument to the above command
-	command_arg_2 - N.CCE(command_type) - an argument to the above command
 
-	Note: See the 'command_type' enumerated list documentation to see 
-	what Node type it expects for its command arguments.  Note that one 
-	or both of the arguments may be optional or required based on what 
-	the command_type is; most command types take exactly 1 argument.
+Unique Constraint List:
+
+	primary - [id]
+
+=head2 command_arg
+
+This type of Node describes a single argument to a "command"; each "command"
+can have zero or more of these, depending on its command_type.
+
+Attribute List:
+
+	id - NODE_ID - MA - unique identifier for each Node within this Node Type
+	command - N.command - PP - MA - what command this argument belongs to
+	catalog_link - N.catalog_link - if arg should be a catalog_link, this is it
+	schema - N.schema - if arg should be a schema, this is it
+	domain - N.domain - if arg should be a domain, this is it
+	sequence - N.sequence - if arg should be a sequence, this is it
+	table - N.table - if arg should be a table, this is it
+	view - N.view - if arg should be a view, this is it
+	routine - N.routine - if arg should be a routine, this is it
+	user - N.user - if arg should be a user, this is it
 
 Unique Constraint List:
 
@@ -2526,7 +2538,7 @@ implement this current catalog_link_instance.  (Each one is like an associative
 array element, having a distinct key name and a value.)  These Nodes are
 intended for use in customizing how the link product is used for this link;
 examples of this include a DSN to use, or whether user/pass are provided in the
-model or at runtime bind variables.
+model or at runtime host parameters.
 
 Attribute List:
 

@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 ######################################################################
 
@@ -180,17 +180,6 @@ my %text_strings = (
 	'SSM_N_SET_NREF_AT_BAD_ARG_VAL' => 
 		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and a Node Id may only be a positive integer",
-	'SSM_N_SET_NREF_AT_CCE_NO_LOOKUP_VAL' => 
-		"$CN.set_node_ref_attribute(): the given ATTR_NAME argument can not be used at this ".
-		"time to set the Node attribute named '{NAME}' because that attribute can ".
-		"potentially take multiple Node types, and we don't have enough information ".
-		"yet to pick a type to resolve the given Node Id into; you can resolve this ".
-		"problem either by giving a Node for the ATTR_NAME argument, or by ".
-		"setting this Node's '{LOOKUP}' enumerated attribute first",
-	'SSM_N_SET_NREF_AT_CCE_ATTR_MUST_BE_NULL' => 
-		"$CN.set_node_ref_attribute(): the given ATTR_NAME argument can not be used at this ".
-		"time to set the Node attribute named '{NAME}' because that attribute must be ".
-		"left empty when this Node's '{LOOKUP}' enumerated attribute is set to '{LOOKVAL}'.",
 	'SSM_N_SET_NREF_AT_NONEX_NID' => 
 		"$CN.set_node_ref_attribute(): invalid ATTR_VALUE argument; '{ARG}' is not a Node ref, ".
 		"and it does not match the Id of any '{EXPTYPE}' Node in this Container",
@@ -254,16 +243,6 @@ my %text_strings = (
 		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because its Node Id value of '{ID}' is already in use by another '{TYPE}' Node ".
 		"in the same Container; one of them needs to be changed first",
-	'SSM_N_PI_CONT_CCE_NO_LOOKUP_VAL' => 
-		"$CN.put_in_container(): this Node can not be put into the given Container ".
-		"at this time because the Node attribute named '{NAME}' can potentially ".
-		"take multiple Node types, and we don't have enough information yet to pick ".
-		"a type to resolve the stored Node Id into; you can resolve this problem by ".
-		"setting this Node's '{LOOKUP}' enumerated attribute first",
-	'SSM_N_PI_CONT_CCE_ATTR_MUST_BE_NULL' => 
-		"$CN.put_in_container(): this Node can not be put into the given Container ".
-		"at this time because the Node attribute named '{NAME}' is valued, but it ".
-		"must be empty when this Node's '{LOOKUP}' enumerated attribute is set to '{LOOKVAL}'.",
 	'SSM_N_PI_CONT_NONEX_AT_NODE' => 
 		"$CN.put_in_container(): this Node can not be put into the given Container ".
 		"because the Node attribute named '{ATNM}' expects to link to a '{TYPE}' Node ".
@@ -367,20 +346,6 @@ my %text_strings = (
 		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
 		"the node ref attribute named '{NAME}' must be given a value when the same ".
 		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEDC_CCE_ATTR_MUST_BE_NULL' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the Node ref attribute named '{NAME}' must be left empty when this ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
-		"it currently references a '{GIVEN}' Node",
-	'SSM_N_TEDC_CCE_ATTR_MUST_BE_SET' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the Node ref attribute named '{NAME}' must have a value when this ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'",
-	'SSM_N_TEDC_CCE_WRONG_NREF_NODE_TYPE' => 
-		"$CN.test_deferrable_constraints(): this '{HOSTTYPE}' Node (id '{ID}') has failed a test; ".
-		"the Node ref attribute named '{NAME}' may only reference a '{EXPTYPE}' Node when this ".
-		"Node's enumerated attribute named '{CHECKNM}' has the value of '{CHECKVL}'; ".
-		"it currently references a '{GIVEN}' Node",
 );
 
 ######################################################################

@@ -1,3 +1,31 @@
+2004-08-26   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.39.
+
+	* New code file versions are: SyntaxModel.pm v0.39, en.pm v0.11.
+
+	* Renamed all references of "bind variables" to "host parameters", since
+	that is the official name for them in the SQL-2003 standard.
+
+	* This release is primarily a reversal of most changes from release 0.36;
+	it removes the dubious feature, and complicated implementing code, data,
+	and documentation, where a Node-ref attribute could be defined to link to
+	more than one type of Node, qualified by a nearby enumerated value
+	attribute.  Corresponding to this, the "command" Node type has been split
+	into itself and the new "command_arg" Node type; the latter has 8 separate
+	"argument value" Node-ref attributes, only one of which is used per Node,
+	and each of which is specific to one Node type.  These methods were
+	simplified and/or reverted to remove the feature:
+	expected_node_ref_attribute_type(), set_node_ref_attribute(),
+	put_in_container(), test_deferrable_constraints().  The private method
+	_resolve_variable_node_ref_attribute_type() was removed entirely.  Small
+	SYNOPSIS update.  Removed feature refs from Language.pod, in the NODE TYPES
+	section.  Removed 7 messages about the feature from en.pm.
+
+	* Due to the Node split, this release is not backwards compatible with any
+	code that used "command" Nodes with previous releases.  Also, this new
+	release is less strict than the old one, but release 0.40 will fix that.
+
 2004-08-16   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.38.

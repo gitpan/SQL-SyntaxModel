@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.38';
+$VERSION = '0.39';
 
 use Locale::KeyedText 0.06;
 
@@ -251,15 +251,6 @@ my $TPI_AT_ENUMS     = 'at_enums'; # Keys are attr names a Node can have which a
 	# Values are enums and match a %ENUMERATED_TYPES key
 my $TPI_AT_NREFS     = 'at_nrefs'; # Keys are attr names a Node can have which are Node Ref/Id values
 	# Values are enums and each matches a single %NODE_TYPES key.
-	# Exception: If value is array ref, then any %NODE_TYPES key may be matched initially; 
-	# during the deferred validation procedure, this value is checked on a per-Node basis 
-	# and must be found to match a single %NODE_TYPES key based on a separate lookup result;
-	# if that array's first/only element is 'CCE', then the separate lookup is done in AT_NREFS_CCE.
-my $TPI_AT_NREFS_CCE = 'at_nrefs_cce'; # Keys match keys of AT_NREFS, values are array refs
-	# First array element matches an AT_ENUMS key whose value in the same Node we 
-	# are to look up.  Second array element is a hash ref whose keys match possible 
-	# results of the first lookup; that hash ref's values are Node types; 
-	# the second match determines what Node type the corresponding AT_NREFS should be.
 my $TPI_P_NODE_ATNMS = 'p_node_atnms'; # Keys match keys of AT_NREFS (P_NODE_ATNMS is a list subset)
 	# Values are meaningless; they simply are the truth value of 1
 my $TPI_P_PSEUDONODE = 'p_pseudonode'; # If set, Nodes of this type have a hard-coded pseudo-parent
@@ -280,10 +271,6 @@ my $TPI_MCEE_LITERALS = 'mcee_literals'; # key is MC atnm, val=array of conditio
 	# the attribute which is MC is mandatory if any condition-pair is true.
 my $TPI_MCEE_ENUMS    = 'mcee_enums'; # see previous
 my $TPI_MCEE_NREFS    = 'mcee_nrefs'; # see previous
-
-# Special flags that may be used in $TPI_AT_NREFS elements go here:
-my $VAR_AT_NREFS_CCE = 'CCE'; # If used, the valid Node type for this Node ref 
-	# attribute is determined by the value of an associated enumerated attribute.
 
 # Names of special "pseudo-nodes" that are used in an XML version of this structure.
 my $SQLSM_L1_ROOT_PSND = 'root';
@@ -928,7 +915,7 @@ my %NODE_TYPES = (
 	},
 	'command' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id application name command_type command_arg_1 command_arg_2
+			id application name command_type
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -938,97 +925,29 @@ my %NODE_TYPES = (
 		},
 		$TPI_AT_NREFS => {
 			'application' => 'application',
-			'command_arg_1' => [$VAR_AT_NREFS_CCE],
-			'command_arg_2' => [$VAR_AT_NREFS_CCE],
-		},
-		$TPI_AT_NREFS_CCE => {
-			'command_arg_1' => ['command_type', {qw(
-				DB_INFO   catalog_link
-				DB_VERIFY catalog_link
-				DB_CREATE catalog_link
-				DB_DELETE catalog_link
-				DB_CLONE  catalog_link
-				DB_MOVE   catalog_link
-				DB_OPEN   catalog_link
-				DB_ATTACH catalog_link
-				DB_DETACH catalog_link
-				SCHEMA_INFO   schema
-				SCHEMA_VERIFY schema
-				SCHEMA_CREATE schema
-				SCHEMA_DELETE schema
-				SCHEMA_CLONE  schema
-				SCHEMA_UPDATE schema
-				DOMAIN_LIST   schema
-				DOMAIN_INFO   domain
-				DOMAIN_VERIFY domain
-				DOMAIN_CREATE domain
-				DOMAIN_DELETE domain
-				DOMAIN_CLONE  domain
-				DOMAIN_UPDATE domain
-				SEQU_LIST   schema
-				SEQU_INFO   sequence
-				SEQU_VERIFY sequence
-				SEQU_CREATE sequence
-				SEQU_DELETE sequence
-				SEQU_CLONE  sequence
-				SEQU_UPDATE sequence
-				TABLE_LIST   schema
-				TABLE_INFO   table
-				TABLE_VERIFY table
-				TABLE_CREATE table
-				TABLE_DELETE table
-				TABLE_CLONE  table
-				TABLE_UPDATE table
-				VIEW_LIST   schema
-				VIEW_INFO   view
-				VIEW_VERIFY view
-				VIEW_CREATE view
-				VIEW_DELETE view
-				VIEW_CLONE  view
-				VIEW_UPDATE view
-				ROUTINE_LIST   schema
-				ROUTINE_INFO   routine
-				ROUTINE_VERIFY routine
-				ROUTINE_CREATE routine
-				ROUTINE_DELETE routine
-				ROUTINE_CLONE  routine
-				ROUTINE_UPDATE routine
-				USER_INFO   user
-				USER_VERIFY user
-				USER_CREATE user
-				USER_DELETE user
-				USER_CLONE  user
-				USER_UPDATE user
-				USER_GRANT  user
-				USER_REVOKE user
-				REC_FETCH   view
-				REC_VERIFY  view
-				REC_INSERT  view
-				REC_UPDATE  view
-				REC_DELETE  view
-				REC_REPLACE view
-				REC_CLONE   view
-				REC_LOCK    view
-				REC_UNLOCK  view
-				CALL_PROC routine
-				CALL_FUNC routine
-			)}],
-			'command_arg_2' => ['command_type', {qw(
-				DB_CLONE      catalog_link
-				DB_MOVE       catalog_link
-				SCHEMA_CLONE  schema
-				DOMAIN_CLONE  domain
-				SEQU_CLONE    sequence
-				TABLE_CLONE   table
-				VIEW_CLONE    view
-				ROUTINE_CLONE routine
-				USER_CLONE    user
-			)}],
 		},
 		$TPI_P_NODE_ATNMS => [qw( application )],
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( command_type )},
 		$TPI_MA_NREFS => {map { ($_ => 1) } qw( application )},
-		# Note: the command_arg_N attributes have implicit mandatory constraints.
+	},
+	'command_arg' => {
+		$TPI_AT_SEQUENCE => [qw( 
+			id command catalog_link schema domain sequence table view routine user
+		)],
+		$TPI_AT_NREFS => {
+			'application' => 'application',
+			'command' => 'command',
+			'catalog_link' => 'catalog_link',
+			'schema' => 'schema',
+			'domain' => 'domain',
+			'sequence' => 'sequence',
+			'table' => 'table',
+			'view' => 'view',
+			'routine' => 'routine',
+			'user' => 'user',
+		},
+		$TPI_P_NODE_ATNMS => [qw( command )],
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( command )},
 	},
 	'data_storage_product' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -1798,7 +1717,6 @@ sub expected_node_ref_attribute_type {
 		$node->_throw_error_message( 'SSM_N_EXP_NREF_AT_INVAL_NM', 
 			{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type } );
 	}
-	ref($exp_node_type) eq 'ARRAY' and $exp_node_type = [@{$exp_node_type}];
 	return( $exp_node_type );
 }
 
@@ -1831,29 +1749,6 @@ sub clear_node_ref_attributes {
 	}
 }
 
-sub _resolve_variable_node_ref_attribute_type {
-	my ($node, $attr_name, $exp_node_type, $error_key_pfx) = @_;
-	my $node_type_info = $NODE_TYPES{$node->{$NPROP_NODE_TYPE}};
-	my ($special_case_type) = @{$exp_node_type};
-	if( $special_case_type eq $VAR_AT_NREFS_CCE ) {
-		# Expected Node type determined by a related enumerated attribute value.
-		my ($lookup_atnm, $rh_vals_to_ntypes) = @{$node_type_info->{$TPI_AT_NREFS_CCE}->{$attr_name}};
-		my $lookup_val = $node->{$NPROP_AT_ENUMS}->{$lookup_atnm};
-		unless( $lookup_val ) {
-			$node->_throw_error_message( $error_key_pfx.'_CCE_NO_LOOKUP_VAL', 
-				{ 'NAME' => $attr_name, 'LOOKUP' => $lookup_atnm } );
-		}
-		# Assume we are internally correct; if we get here, a hash value exists if the 
-		# attribute should be set, and it does not if the attribute should be empty.
-		unless( $rh_vals_to_ntypes->{$lookup_val} ) {
-			$node->_throw_error_message( $error_key_pfx.'_CCE_ATTR_MUST_BE_NULL', 
-				{ 'NAME' => $attr_name, 'LOOKUP' => $lookup_atnm, 'LOOKVAL' => $lookup_val } );
-		}
-		return( $rh_vals_to_ntypes->{$lookup_val} );
-	}
-	# Assume we can not have any other special case types.
-}
-
 sub _clear_node_ref_attribute {
 	my ($node, $attr_name) = @_;
 	my $attr_value = $node->{$NPROP_AT_NREFS}->{$attr_name} or return( 1 ); # no-op; attr not set
@@ -1880,11 +1775,9 @@ sub set_node_ref_attribute {
 		# We were given a Node object for a new attribute value.
 
 		unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-			unless( ref($exp_node_type) eq 'ARRAY' ) { # An ary ref means let all Node types in.
-				$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
-					'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE} } );
-			}
+			$node->_throw_error_message( 'SSM_N_SET_NREF_AT_WRONG_NODE_TYPE', 
+				{ 'NAME' => $attr_name, 'HOSTTYPE' => $node->{$NPROP_NODE_TYPE}, 
+				'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE} } );
 		}
 
 		if( $attr_value->{$NPROP_CONTAINER} and $node->{$NPROP_CONTAINER} ) {
@@ -1910,15 +1803,11 @@ sub set_node_ref_attribute {
 		}
 
 		if( my $container = $node->{$NPROP_CONTAINER} ) {
-			if( ref($exp_node_type) eq 'ARRAY' ) { # An ary ref means type is conditional.
-				$exp_node_type = $node->_resolve_variable_node_ref_attribute_type( 
-					$attr_name, $exp_node_type, 'SSM_N_SET_NREF_AT' );
-			}
-			unless( $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value} ) {
+			$attr_value = $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value};
+			unless( $attr_value ) {
 				$node->_throw_error_message( 'SSM_N_SET_NREF_AT_NONEX_NID', 
 					{ 'ARG' => $attr_value, 'EXPTYPE' => $exp_node_type } );
 			}
-			$attr_value = $container->{$CPROP_ALL_NODES}->{$exp_node_type}->{$attr_value};
 		}
 	}
 
@@ -2182,10 +2071,6 @@ sub put_in_container {
 		# Note that if $tpi_at_nodes is undefined, expect that this foreach loop will not run
 		my $at_nodes_nid = $rh_at_nodes_nids->{$at_nodes_atnm};
 		my $at_node_type = $tpi_at_nodes->{$at_nodes_atnm};
-		if( ref($at_node_type) eq 'ARRAY' ) { # An ary ref means type is conditional.
-			$at_node_type = $node->_resolve_variable_node_ref_attribute_type( 
-				$at_nodes_atnm, $at_node_type, 'SSM_N_PI_CONT' );
-		}
 		my $at_nodes_ref = $rh_cnl_bt->{$at_node_type}->{$at_nodes_nid};
 		unless( $at_nodes_ref ) {
 			$node->_throw_error_message( 'SSM_N_PI_CONT_NONEX_AT_NODE', 
@@ -2545,45 +2430,6 @@ sub test_deferrable_constraints {
 		}
 	}
 
-	# Now test that Node ref attributes whose expected Node types can be variable 
-	# based on other Node attributes have the correct correspondence; 
-	# also check if they are set or not set as appropriate.
-
-	if( my $variable_attrs = $type_info->{$TPI_AT_NREFS_CCE} ) {
-		my $at_enums = $node->{$NPROP_AT_ENUMS};
-		my $at_nrefs = $node->{$NPROP_AT_NREFS};
-		foreach my $attr_name (keys %{$variable_attrs}) {
-			my ($lookup_atnm, $rh_vals_to_ntypes) = @{$variable_attrs->{$attr_name}};
-			my $lookup_val = $at_enums->{$lookup_atnm}; 
-			# We assume the enum value we have to look at is set since if it wasn't 
-			# then one of the mandatory value checks above would have caught it.
-			my $exp_node_type = $rh_vals_to_ntypes->{$lookup_val};
-			my $attr_value = $at_nrefs->{$attr_name};
-			if( !$exp_node_type and !$attr_value ) {
-				# No-op, no problem, $attr_value should be empty and is empty.
-			} elsif( !$exp_node_type and $attr_value ) {
-				# A null $exp_node_type means $attr_value should be null.
-				$node->_throw_error_message( 'SSM_N_TEDC_CCE_ATTR_MUST_BE_NULL', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-					'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
-					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
-			} elsif( $exp_node_type and !$attr_value ) {
-				# A set $exp_node_type means $attr_value must be set.
-				$node->_throw_error_message( 'SSM_N_TEDC_CCE_ATTR_MUST_BE_SET', 
-					{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-					'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
-			} else {
-				# A set $exp_node_type means $attr_value must have the same type.
-				unless( $attr_value->{$NPROP_NODE_TYPE} eq $exp_node_type ) {
-					$node->_throw_error_message( 'SSM_N_TEDC_CCE_WRONG_NREF_NODE_TYPE', 
-						{ 'NAME' => $attr_name, 'HOSTTYPE' => $node_type, 'ID' => $node_id, 
-						'EXPTYPE' => $exp_node_type, 'GIVEN' => $attr_value->{$NPROP_NODE_TYPE},
-						'CHECKNM' => $lookup_atnm, 'CHECKVL' => $lookup_val } );
-				}
-			}
-		}
-	}
-
 	# TODO: Tests that examine a Node's correctness based on attributes of related Nodes.
 }
 
@@ -2750,8 +2596,12 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			</catalog>
 			<application id="1" name="Setup">
 				<catalog_link id="1" application="1" name="admin_link" target="1" />
-				<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE" command_arg_1="1" />
-				<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE" command_arg_1="1" />
+				<command id="1" application="1" name="install_app_schema" command_type="DB_CREATE">
+					<command_arg id="1" command="1" catalog_link="1" />
+				</command>
+				<command id="2" application="1" name="remove_app_schema" command_type="DB_DELETE">
+					<command_arg id="2" command="2" catalog_link="1" />
+				</command>
 			</application>
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
@@ -2920,7 +2770,7 @@ Nodes; if this one copy is changed, everything using it updates automatically.
 
 This second set of Nodes describes a routine that takes 4 arguments (each of
 which is an actual argument if a named stored procedure is generated, or a
-named bind variable if un-named client-side SQL is generated) and performs an
+named host parameter if un-named client-side SQL is generated) and performs an
 UPDATE query against one table record; the query takes 4 arguments, using one
 to match a record and 3 as new record column values to set.
 
@@ -2951,7 +2801,7 @@ The above Node group, *together* with the previous Node group, has details to
 generate the following SQL statements.  There are two versions of SQL given for
 the same task; the first one is for databases that support named bind
 variables, illustrated using the Oracle style of ':foo'; the second one is for
-those that require positional bind variables, illustrated with the DBI style of
+those that require positional host parameters, illustrated with the DBI style of
 '?'.  These two SQL variants are intended to be run by the SQL client.
 
 	UPDATE person
@@ -2984,7 +2834,7 @@ like the first example.
 	END;
 
 To go with those, here are SQL statements to invoke the server-side stored
-procedures, with the two variants being named-vs-positional bind variables.
+procedures, with the two variants being named-vs-positional host parameters.
 
 	CALL update_a_person (:arg_person_id, :arg_person_name, :arg_father_id, :arg_mother_id);
 
@@ -3088,7 +2938,7 @@ accomplish some of their work, which means making sure generated SQL is in the
 right dialect or syntax, and making sure literal values are escaped correctly.
 By using this module, applications can simply copy appropriate individual
 elements in their data dictionaries to SQL::SyntaxModel properties, including
-column names, table names, function names, literal values, bind variable names,
+column names, table names, function names, literal values, host parameter names,
 and they don't have to do any string parsing or assembling.
 
 Now, I can only imagine why all of the other SQL generating/parsing modules
