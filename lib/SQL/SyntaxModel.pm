@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 use Locale::KeyedText 0.03;
 
@@ -206,6 +206,8 @@ my %ENUMERATED_TYPES = (
 		DB_PING DB_ATTACH DB_DETACH 
 		TRA_OPEN 
 		TRA_CLOSE
+		SEQU_LIST SEQU_INFO SEQU_VERIFY
+		SEQU_CREATE SEQU_DELETE SEQU_CLONE SEQU_UPDATE
 		TABLE_LIST TABLE_INFO TABLE_VERIFY
 		TABLE_CREATE TABLE_DELETE TABLE_CLONE TABLE_UPDATE
 		VIEW_LIST VIEW_INFO VIEW_VERIFY
@@ -252,14 +254,14 @@ my @L2_PSEUDONODE_LIST = ($SQLSM_L2_ELEM_PSND, $SQLSM_L2_BLPR_PSND,
 my %NODE_TYPES = (
 	'domain' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id name base_type num_scale num_precision num_octets num_unsigned 
+			id name base_type num_precision num_scale num_octets num_unsigned 
 			max_octets max_chars store_fixed char_enc trim_white uc_latin lc_latin 
 			pad_char trim_pad calendar range_min range_max 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
-			'num_scale' => 'uint',
 			'num_precision' => 'uint',
+			'num_scale' => 'uint',
 			'num_octets' => 'uint',
 			'num_unsigned' => 'bool',
 			'max_octets' => 'uint',
@@ -2111,7 +2113,7 @@ included.)  However, here are a few example usage lines:
 		$dom_entity_id->add_reciprocal_links();
 		$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
 		$dom_entity_id->set_enumerated_attribute( 'base_type', 'NUM_INT' );
-		$dom_entity_id->set_literal_attribute( 'num_scale', 9 );
+		$dom_entity_id->set_literal_attribute( 'num_precision', 9 );
 
 		# ... add a few more Nodes
 
@@ -2165,7 +2167,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 
 	<root>
 		<elements>
-			<domain id="1" name="entity_id" base_type="NUM_INT" num_scale="9" />
+			<domain id="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
 			<domain id="2" name="person_name" base_type="STR_CHAR" max_chars="100" />
 		</elements>
 		<blueprints>

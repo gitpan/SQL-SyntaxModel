@@ -737,7 +737,7 @@ function (a grouping func, like 'count')
 	LE      - true if first arg is less than or equal to second
 	GE      - true if first arg is greater than or equal to second
 	IS_NULL - true if only arg is a null value
-	NVL     - returns arg 1 if it is not null, else arg 2
+	NVL     - aka COALESCE (SQL-92 name) - returns arg 1 if it is not null, else arg 2
 	SWITCH  - a logical switch-case expr (like Oracle 'decode')
 	LIKE    - true if first arg contains second; args 3,4 are flags
 	ADD     - result of adding all args as numbers
@@ -931,22 +931,29 @@ These commands must be called in a "transaction" context and destroy that contex
 
 These commands must be called in a "transaction" context:
 
+	SEQU_LIST    - fetches a list of sequences in schema of open db instance
+	SEQU_INFO    - fetches some detailed info about a sequence
+	SEQU_VERIFY  - compares a provided sequence spec to an actual table
+	SEQU_CREATE  - creates a new sequence in schema of open db inst
+	SEQU_DELETE  - deletes an existing sequence in open db inst (if it can)
+	SEQU_CLONE   - creates a clone of an existing sequence with different name
+	SEQU_UPDATE  - alters schema for an existing sequence
 	TABLE_LIST   - fetches a list of tables in schema of open db instance
-	TABLE_INFO   - fetches some detailed info about a database instance
+	TABLE_INFO   - fetches some detailed info about a table
 	TABLE_VERIFY - compares a provided table spec to an actual table
 	TABLE_CREATE - creates a new table in schema of open db inst
 	TABLE_DELETE - deletes an existing table in open db inst (if it can)
 	TABLE_CLONE  - creates a clone of an existing table with different name
 	TABLE_UPDATE - alters schema for an existing table
 	VIEW_LIST    - fetches a list of views in schema of open db instance
-	VIEW_INFO    - fetches some detailed info about a database instance
+	VIEW_INFO    - fetches some detailed info about a view
 	VIEW_VERIFY  - compares a provided view spec to an actual view
 	VIEW_CREATE  - creates a new view in schema of open db inst
 	VIEW_DELETE  - deletes an existing view in open db inst (if it can)
 	VIEW_CLONE   - creates a clone of an existing view with different name
 	VIEW_UPDATE  - alters schema for an existing view
 	ROUTINE_LIST   - fetches a list of routines/procs/funcs of open db instance
-	ROUTINE_INFO   - fetches some detailed info about a database instance
+	ROUTINE_INFO   - fetches some detailed info about a routine
 	ROUTINE_VERIFY - compares a provided routine spec to an actual routine
 	ROUTINE_CREATE - creates a new routine in schema of open db inst
 	ROUTINE_DELETE - deletes an existing routine in open db inst (if it can)
@@ -1038,12 +1045,12 @@ identifier that can be referenced by entities such as table column definitions,
 view column definitions, and routine variables, as their "data type"; 2. The
 domain can impose restrictions within the base data type as to what values can
 be stored (eg: a STR_CHAR may only be 30 characters long, or a NUM_EXA may only
-be 5 digits wide with hundredths precision); 3. The domain can define simple
-pre or post processing of values, such as trimming of bounding whitespace or
-uppercasing its contents.
+be 5 digits wide with 2 digits on the right of the decimal point); 3. The
+domain can define simple pre or post processing of values, such as trimming of
+bounding whitespace or uppercasing its contents.
 
 For example, the user may decide to create a custom data type called
-"currency", which is a decimal number of scale 15 and a precision of 2.  Or,
+"currency", which is a decimal number of precision 15 and a scale of 2.  Or,
 they may want to have an "ip address" type, which is a string that can hold 15
 characters (how ips are normally displayed to humans).  Or, they may want a
 custom SIN or telephone-no or person-name type.  They can then refer to these
@@ -1063,10 +1070,10 @@ Attribute List:
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	name - L.cstr - MA - name of the user customized data type
 	base_type - E.simple_data_type - MA - name of the base data type this data_type is customized from
-	num_scale - L.uint - MC(base_type=NUM_INT|NUM_EXA) - maximum size in digits an exact number can be
-	num_precision - L.uint - MC(base_type=NUM_EXA) - num digits of fractional precision we allowed
-	num_octets - L.uint - MC(base_type=NUM_APR) - fixed size in octets for an inexact (floating point) num
-	num_unsigned - L.bool - when base_type is NUM_*, true means only >= 0 may be stored
+	num_precision - L.uint - max length in digits for exact number, or count of significant digits for inexact 
+	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the decimal point
+	num_octets - L.uint - for integral or inexact (floating point) numbers, fixed storage size in octets
+	num_unsigned - L.bool - for numbers, true means only values >= 0 may be stored
 	max_octets - L.uint - MC(base_type=STR_BIT) - maximum size in octets for a binary/bit string
 	max_chars - L.uint - MC(base_type=STR_CHAR) - maximum size in characters for a character string
 	store_fixed - L.bool - when true then try to reserve max size on disk even if not all used
@@ -1087,7 +1094,7 @@ Unique Constraint List:
 
 Example List:
 
-	|id|name    |base    |ns |np|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
+	|id|name    |base    |np |ns|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
 	|--|--------|--------|---|--|--|--|-----|----|--|-----|--|--|--|--|---|
 	| 1|bin1k   |STR_BIT |   |  |  |  | 1000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 1000 octets
 	| 2|bin32k  |STR_BIT |   |  |  |  |32000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 32000 octets
@@ -1095,18 +1102,18 @@ Example List:
 	| 4|str10   |STR_CHAR|   |  |  |  |     |  10|1 |ASCII|1 |  |20|1 |   | - a fix-w 10 char ascii cstr, case-preserve, spc-pad
 	| 5|str30   |STR_CHAR|   |  |  |  |     |  30|  |ASCII|1 |  |  |  |   | - a fix-w 30 char ascii cstr, case-preserving
 	| 6|str2k   |STR_CHAR|   |  |  |  |     |2000|  |UTF8 |  |  |  |  |   | - a var-w 2000 char unicode cstr, case-preserving
-	| 7|byte    |NUM_INT |  3|  |  |  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
-	| 8|short   |NUM_INT |  5|  |  |  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
-	| 9|int     |NUM_INT | 10|  |  |  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
-	|10|long    |NUM_INT | 19|  |  |  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
-	|11|ubyte   |NUM_INT |  3|  |  |1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
-	|12|ushort  |NUM_INT |  5|  |  |1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
-	|13|uint    |NUM_INT | 10|  |  |1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
-	|14|ulong   |NUM_INT | 19|  |  |1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
+	| 7|byte    |NUM_INT |   |  | 1|  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
+	| 8|short   |NUM_INT |   |  | 2|  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
+	| 9|int     |NUM_INT |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
+	|10|long    |NUM_INT |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
+	|11|ubyte   |NUM_INT |   |  | 1|1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
+	|12|ushort  |NUM_INT |   |  | 2|1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
+	|13|uint    |NUM_INT |   |  | 4|1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
+	|14|ulong   |NUM_INT |   |  | 8|1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
 	|15|float   |NUM_APR |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit imprecise fractional number
 	|16|double  |NUM_APR |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit imprecise fractional number
-	|17|dec10p2 |NUM_EXA | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths precision
-	|18|dec255  |NUM_EXA |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary precision
+	|17|dec10p2 |NUM_EXA | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths scale
+	|18|dec255  |NUM_EXA |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary scale
 	|19|boolean |BOOLEAN |   |  |  |  |     |    |  |     |  |  |  |  |   | - a boolean; only 2 values of false or true
 	|20|datetime|DATETIME|   |  |  |  |     |    |  |     |  |  |  |  |ABS| - a date and time or date, non-calendar specific
 	|21|dtchines|DATETIME|   |  |  |  |     |    |  |     |  |  |  |  |CHI| - a date and time or date, in the Chinese calendar

@@ -1,3 +1,19 @@
+2004-04-10   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.29.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.16) to transpose the
+	'domain' Node attributes 'num_precision' and 'num_scale'.  Up until now I
+	was using 'scale' to mean the same thing that everyone else uses
+	'precision' to mean, and vice-versa; now I am using the terms to mean the
+	same things as is widely accepted.  Further updated the documentation for
+	all 'num_*' attributes, removed any conditional mandatory constraints on
+	them.  Made a small corresponding change in t_SQL_SyntaxModel.pm.
+
+	* Updated the 'command_type' enumerated type to include a set of 'SEQU_*' 
+	commands that look like the ones for 'TABLE_*', 'VIEW_*', 'ROUTINE_*'.  
+	Other minor changes in Language.pod and SyntaxModel.pm.
+
 2004-03-22   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.28.

@@ -39,7 +39,7 @@ sub create_and_populate_model {
 	my $dom_entity_id = make_a_node( 'domain', 1, $model );
 	$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
 	$dom_entity_id->set_enumerated_attribute( 'base_type', 'NUM_INT' );
-	$dom_entity_id->set_literal_attribute( 'num_scale', 9 );
+	$dom_entity_id->set_literal_attribute( 'num_precision', 9 );
 
 	# Create user-defined data type domain that our person names are:
 	my $dom_pers_name = make_a_node( 'domain', 2, $model );
@@ -450,7 +450,7 @@ sub expected_model_xml_output {
 	return(
 '<root>
 	<elements>
-		<domain id="1" name="entity_id" base_type="NUM_INT" num_scale="9" />
+		<domain id="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
 		<domain id="2" name="person_name" base_type="STR_CHAR" max_chars="100" />
 	</elements>
 	<blueprints>
