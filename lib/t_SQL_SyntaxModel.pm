@@ -35,17 +35,8 @@ sub create_and_populate_model {
 
 	##### FIRST SET ELEMENT-TYPE DETAILS #####
 
-	# Create user-defined data type domain that our database record primary keys are:
-	my $dom_entity_id = make_a_node( 'domain', 1, $model );
-	$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
-	$dom_entity_id->set_enumerated_attribute( 'base_type', 'NUM_INT' );
-	$dom_entity_id->set_literal_attribute( 'num_precision', 9 );
-
-	# Create user-defined data type domain that our person names are:
-	my $dom_pers_name = make_a_node( 'domain', 2, $model );
-	$dom_pers_name->set_literal_attribute( 'name', 'person_name' );
-	$dom_pers_name->set_enumerated_attribute( 'base_type', 'STR_CHAR' );
-	$dom_pers_name->set_literal_attribute( 'max_chars', 100 );
+	# As of SQL::SyntaxModel v0.18 there aren't any of these (but some may 
+	# come later); the 'domain' Nodes now appear under BLUEPRINT-TYPE DETAILS.
 
 	##### NEXT SET CATALOG BLUEPRINT-TYPE DETAILS #####
 
@@ -59,6 +50,18 @@ sub create_and_populate_model {
 	my $schema = make_a_child_node( 'schema', 1, $catalog_bp, 'catalog' );
 	$schema->set_literal_attribute( 'name', 'gene' );
 	$schema->set_node_ref_attribute( 'owner', $owner );
+
+	# Create user-defined data type domain that our database record primary keys are:
+	my $dom_entity_id = make_a_child_node( 'domain', 1, $schema, 'schema' );
+	$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
+	$dom_entity_id->set_enumerated_attribute( 'base_type', 'NUM_INT' );
+	$dom_entity_id->set_literal_attribute( 'num_precision', 9 );
+
+	# Create user-defined data type domain that our person names are:
+	my $dom_pers_name = make_a_child_node( 'domain', 2, $schema, 'schema' );
+	$dom_pers_name->set_literal_attribute( 'name', 'person_name' );
+	$dom_pers_name->set_enumerated_attribute( 'base_type', 'STR_CHAR' );
+	$dom_pers_name->set_literal_attribute( 'max_chars', 100 );
 
 	# Define the table that holds our data:
 	my $tb_person = make_a_child_node( 'table', 1, $schema, 'schema' );
@@ -155,6 +158,7 @@ sub create_and_populate_model {
 	my $vw_fetchall = make_a_child_node( 'view', 2, $rt_fetchall, 'routine' );
 	$vw_fetchall->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_fetchall->set_enumerated_attribute( 'view_type', 'MATCH' );
+	$vw_fetchall->set_literal_attribute( 'name', 'fetch_all_persons' );
 	$vw_fetchall->set_literal_attribute( 'match_all_cols', 1 );
 	my $vw_fetchall_s1 = make_a_child_node( 'view_src', 3, $vw_fetchall, 'view' );
 	$vw_fetchall_s1->set_literal_attribute( 'name', 'person' );
@@ -200,6 +204,7 @@ sub create_and_populate_model {
 	my $vw_insertone = make_a_child_node( 'view', 14, $rt_insertone, 'routine' );
 	$vw_insertone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_insertone->set_enumerated_attribute( 'view_type', 'MATCH' );
+	$vw_insertone->set_literal_attribute( 'name', 'insert_a_person' );
 	my $vws_ins_pers = make_a_child_node( 'view_src', 15, $vw_insertone, 'view' );
 	$vws_ins_pers->set_literal_attribute( 'name', 'person' );
 	$vws_ins_pers->set_node_ref_attribute( 'match_table', $tb_person );
@@ -234,7 +239,7 @@ sub create_and_populate_model {
 	my $rts_insert = make_a_child_node( 'routine_stmt', 24, $rt_insertone, 'routine' );
 	$rts_insert->set_enumerated_attribute( 'stmt_type', 'SPROC' );
 	$rts_insert->set_enumerated_attribute( 'call_sproc', 'INSERT' );
-	$rts_insert->set_node_ref_attribute( 'c_view', $vw_insertone );
+	$rts_insert->set_node_ref_attribute( 'view_for_dml', $vw_insertone );
 	# ... Currently, nothing is returned, though a count of affected rows could be later
 
 	# Describe a routine that updates a record in the 'person' table:
@@ -260,6 +265,7 @@ sub create_and_populate_model {
 	my $vw_updateone = make_a_child_node( 'view', 30, $rt_updateone, 'routine' );
 	$vw_updateone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_updateone->set_enumerated_attribute( 'view_type', 'MATCH' );
+	$vw_updateone->set_literal_attribute( 'name', 'update_a_person' );
 	my $vws_upd_pers = make_a_child_node( 'view_src', 31, $vw_updateone, 'view' );
 	$vws_upd_pers->set_literal_attribute( 'name', 'person' );
 	$vws_upd_pers->set_node_ref_attribute( 'match_table', $tb_person );
@@ -299,7 +305,7 @@ sub create_and_populate_model {
 	my $rts_update = make_a_child_node( 'routine_stmt', 42, $rt_updateone, 'routine' );
 	$rts_update->set_enumerated_attribute( 'stmt_type', 'SPROC' );
 	$rts_update->set_enumerated_attribute( 'call_sproc', 'UPDATE' );
-	$rts_update->set_node_ref_attribute( 'c_view', $vw_updateone );
+	$rts_update->set_node_ref_attribute( 'view_for_dml', $vw_updateone );
 	# ... Currently, nothing is returned, though a count of affected rows could be later
 
 	# Describe a routine that deletes a record from the 'person' table:
@@ -313,6 +319,7 @@ sub create_and_populate_model {
 	my $vw_deleteone = make_a_child_node( 'view', 45, $rt_deleteone, 'routine' );
 	$vw_deleteone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_deleteone->set_enumerated_attribute( 'view_type', 'MATCH' );
+	$vw_deleteone->set_literal_attribute( 'name', 'delete_a_person' );
 	my $vws_del_pers = make_a_child_node( 'view_src', 46, $vw_deleteone, 'view' );
 	$vws_del_pers->set_literal_attribute( 'name', 'person' );
 	$vws_del_pers->set_node_ref_attribute( 'match_table', $tb_person );
@@ -331,7 +338,7 @@ sub create_and_populate_model {
 	my $rts_delete = make_a_child_node( 'routine_stmt', 51, $rt_deleteone, 'routine' );
 	$rts_delete->set_enumerated_attribute( 'stmt_type', 'SPROC' );
 	$rts_delete->set_enumerated_attribute( 'call_sproc', 'DELETE' );
-	$rts_delete->set_node_ref_attribute( 'c_view', $vw_deleteone );
+	$rts_delete->set_node_ref_attribute( 'view_for_dml', $vw_deleteone );
 	# ... Currently, nothing is returned, though a count of affected rows could be later
 
 	##### NEXT SET PRODUCT-TYPE DETAILS #####
@@ -449,14 +456,13 @@ sub create_and_populate_model {
 sub expected_model_xml_output {
 	return(
 '<root>
-	<elements>
-		<domain id="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
-		<domain id="2" name="person_name" base_type="STR_CHAR" max_chars="100" />
-	</elements>
+	<elements />
 	<blueprints>
 		<catalog id="1">
 			<owner id="1" catalog="1" />
 			<schema id="1" catalog="1" name="gene" owner="1">
+				<domain id="1" schema="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
+				<domain id="2" schema="1" name="person_name" base_type="STR_CHAR" max_chars="100" />
 				<table id="1" schema="1" name="person">
 					<table_col id="1" table="1" name="person_id" domain="1" mandatory="1" default_val="1" auto_inc="1" />
 					<table_col id="2" table="1" name="name" domain="2" mandatory="1" />
@@ -482,7 +488,7 @@ sub expected_model_xml_output {
 		<application id="2" name="People Watcher">
 			<catalog_link id="2" application="2" name="editor_link" target="1" />
 			<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-				<view id="2" view_context="ROUTINE" view_type="MATCH" routine="1" match_all_cols="1">
+				<view id="2" view_context="ROUTINE" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
 					<view_src id="3" view="2" name="person" match_table="1" />
 				</view>
 				<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
@@ -498,7 +504,7 @@ sub expected_model_xml_output {
 				<routine_arg id="11" routine="9" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="12" routine="9" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="13" routine="9" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="14" view_context="ROUTINE" view_type="MATCH" routine="9">
+				<view id="14" view_context="ROUTINE" view_type="MATCH" name="insert_a_person" routine="9">
 					<view_src id="15" view="14" name="person" match_table="1">
 						<view_src_col id="16" src="15" match_table_col="1" />
 						<view_src_col id="17" src="15" match_table_col="2" />
@@ -510,14 +516,14 @@ sub expected_model_xml_output {
 					<view_expr id="22" expr_type="ARG" view="14" view_part="SET" set_view_col="18" routine_arg="12" />
 					<view_expr id="23" expr_type="ARG" view="14" view_part="SET" set_view_col="19" routine_arg="13" />
 				</view>
-				<routine_stmt id="24" routine="9" stmt_type="SPROC" call_sproc="INSERT" c_view="14" />
+				<routine_stmt id="24" routine="9" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="14" />
 			</routine>
 			<routine id="25" routine_type="ANONYMOUS" application="2" name="update_a_person">
 				<routine_arg id="26" routine="25" name="arg_person_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="30" view_context="ROUTINE" view_type="MATCH" routine="25">
+				<view id="30" view_context="ROUTINE" view_type="MATCH" name="update_a_person" routine="25">
 					<view_src id="31" view="30" name="person" match_table="1">
 						<view_src_col id="32" src="31" match_table_col="1" />
 						<view_src_col id="33" src="31" match_table_col="2" />
@@ -532,11 +538,11 @@ sub expected_model_xml_output {
 						<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
 					</view_expr>
 				</view>
-				<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" c_view="30" />
+				<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="30" />
 			</routine>
 			<routine id="43" routine_type="ANONYMOUS" application="2" name="delete_a_person">
 				<routine_arg id="44" routine="43" name="arg_person_id" var_type="SCALAR" domain="1" />
-				<view id="45" view_context="ROUTINE" view_type="MATCH" routine="43">
+				<view id="45" view_context="ROUTINE" view_type="MATCH" name="delete_a_person" routine="43">
 					<view_src id="46" view="45" name="person" match_table="1">
 						<view_src_col id="47" src="46" match_table_col="1" />
 					</view_src>
@@ -545,7 +551,7 @@ sub expected_model_xml_output {
 						<view_expr id="50" expr_type="ARG" p_expr="48" routine_arg="44" />
 					</view_expr>
 				</view>
-				<routine_stmt id="51" routine="43" stmt_type="SPROC" call_sproc="DELETE" c_view="45" />
+				<routine_stmt id="51" routine="43" stmt_type="SPROC" call_sproc="DELETE" view_for_dml="45" />
 			</routine>
 		</application>
 	</blueprints>

@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.17';
+$VERSION = '0.18';
 
 use Locale::KeyedText 0.03;
 
@@ -135,6 +135,9 @@ my $NPROP_CHILD_NODES = 'child_nodes'; # array - list of refs to other Nodes hav
 # here so that multiple Node types can make use of the same value lists.  
 # Currently only the codes are shown, but attributes may be attached later.
 my %ENUMERATED_TYPES = (
+	'privilege_type' => { map { ($_ => 1) } qw(
+		ALL SELECT DELETE INSERT UPDATE CONNECT EXECUTE CREATE ALTER DROP 
+	) },
 	'simple_data_type' => { map { ($_ => 1) } qw(
 		NUM_INT NUM_EXA NUM_APR STR_BIT STR_CHAR BOOLEAN 
 		DATM_FULL DATM_DATE DATM_TIME INTRVL_YM INTRVL_DT 
@@ -144,9 +147,6 @@ my %ENUMERATED_TYPES = (
 	) },
 	'calendar' => { map { ($_ => 1) } qw(
 		ABS GRE JUL CHI HEB ISL JPN
-	) },
-	'privilege_type' => { map { ($_ => 1) } qw(
-		CONNECT SELECT INSERT UPDATE DELETE EXECUTE CREATE ALTER DROP 
 	) },
 	'table_index_type' => { map { ($_ => 1) } qw(
 		ATOMIC FULLTEXT UNIQUE FOREIGN UFOREIGN
@@ -164,7 +164,7 @@ my %ENUMERATED_TYPES = (
 		CROSS INNER LEFT RIGHT FULL
 	) },
 	'view_part' => { map { ($_ => 1) } qw(
-		RESULT SET WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
+		RESULT INTO SET FROM WHERE GROUP HAVING WINDOW ORDER MAXR SKIPR
 	) },
 	'basic_expr_type' => { map { ($_ => 1) } qw(
 		LIT COL MCOL VARG ARG VAR CAST SEQN CVIEW SFUNC UFUNC
@@ -182,8 +182,13 @@ my %ENUMERATED_TYPES = (
 	'routine_type' => { map { ($_ => 1) } qw(
 		ANONYMOUS PACKAGE TRIGGER PROCEDURE FUNCTION LOOP CONDITION
 	) },
+	'basic_trigger_event' => { map { ($_ => 1) } qw(
+		BEFR_INS AFTR_INS INST_INS 
+		BEFR_UPD AFTR_UPD INST_UPD 
+		BEFR_DEL AFTR_DEL INST_DEL
+	) },
 	'basic_stmt_type' => { map { ($_ => 1) } qw(
-		SPROC UPROC ASSIGN LOGIC
+		ASSIGN SPROC UPROC LOGIC
 	) },
 	'standard_proc' => { map { ($_ => 1) } qw(
 		RETURN 
@@ -205,6 +210,10 @@ my %ENUMERATED_TYPES = (
 		DB_PING DB_ATTACH DB_DETACH 
 		TRA_OPEN 
 		TRA_CLOSE
+		SCHEMA_LIST SCHEMA_INFO SCHEMA_VERIFY
+		SCHEMA_CREATE SCHEMA_DELETE SCHEMA_CLONE SCHEMA_UPDATE 
+		DOMAIN_LIST DOMAIN_INFO DOMAIN_VERIFY
+		DOMAIN_CREATE DOMAIN_DELETE DOMAIN_CLONE DOMAIN_UPDATE
 		SEQU_LIST SEQU_INFO SEQU_VERIFY
 		SEQU_CREATE SEQU_DELETE SEQU_CLONE SEQU_UPDATE
 		TABLE_LIST TABLE_INFO TABLE_VERIFY
@@ -251,53 +260,6 @@ my @L2_PSEUDONODE_LIST = ($SQLSM_L2_ELEM_PSND, $SQLSM_L2_BLPR_PSND,
 # allowed child Node types.  They are used for method input checking and 
 # other related tasks.
 my %NODE_TYPES = (
-	'domain' => {
-		$TPI_AT_SEQUENCE => [qw( 
-			id name base_type num_precision num_scale num_octets num_unsigned 
-			max_octets max_chars store_fixed char_enc trim_white uc_latin lc_latin 
-			pad_char trim_pad calendar with_zone range_min range_max 
-		)],
-		$TPI_AT_LITERALS => {
-			'name' => 'cstr',
-			'num_precision' => 'uint',
-			'num_scale' => 'uint',
-			'num_octets' => 'uint',
-			'num_unsigned' => 'bool',
-			'max_octets' => 'uint',
-			'max_chars' => 'uint',
-			'store_fixed' => 'bool',
-			'trim_white' => 'bool',
-			'uc_latin' => 'bool',
-			'lc_latin' => 'bool',
-			'pad_char' => 'cstr',
-			'trim_pad' => 'bool',
-			'with_zone' => 'sint',
-			'range_min' => 'misc',
-			'range_max' => 'misc',
-		},
-		$TPI_AT_ENUMS => {
-			'base_type' => 'simple_data_type',
-			'char_enc' => 'char_enc_type',
-			'calendar' => 'calendar',
-		},
-		$TPI_P_PSEUDONODE => $SQLSM_L2_ELEM_PSND,
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( base_type )},
-	},
-	'domain_opt' => {
-		$TPI_AT_SEQUENCE => [qw( 
-			id domain value 
-		)],
-		$TPI_AT_LITERALS => {
-			'value' => 'misc',
-		},
-		$TPI_AT_NREFS => {
-			'domain' => 'domain',
-		},
-		$TPI_P_NODE_ATNMS => [qw( domain )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( value )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( domain )},
-	},
 	'catalog' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id name 
@@ -354,6 +316,7 @@ my %NODE_TYPES = (
 			'owner' => 'owner',
 		},
 		$TPI_P_NODE_ATNMS => [qw( catalog )],
+		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog owner )},
 	},
 	'role' => {
@@ -370,22 +333,85 @@ my %NODE_TYPES = (
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_NREFS => {map { ($_ => 1) } qw( catalog )},
 	},
-	'privilege' => {
+	'privilege_on' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id role priv_type schema table routine
+			id role schema domain sequence table routine
+		)],
+		$TPI_AT_NREFS => {
+			'role' => 'role',
+			'schema' => 'schema',
+			'domain' => 'domain',
+			'sequence' => 'sequence',
+			'table' => 'table',
+			'routine' => 'routine',
+		},
+		$TPI_P_NODE_ATNMS => [qw( role )],
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( role )},
+	},
+	'privilege_for' => {
+		$TPI_AT_SEQUENCE => [qw( 
+			id priv_on priv_type
 		)],
 		$TPI_AT_ENUMS => {
 			'priv_type' => 'privilege_type',
 		},
 		$TPI_AT_NREFS => {
-			'role' => 'role',
-			'schema' => 'schema',
-			'table' => 'table',
-			'routine' => 'routine',
+			'priv_on' => 'privilege_on',
 		},
-		$TPI_P_NODE_ATNMS => [qw( role )],
+		$TPI_P_NODE_ATNMS => [qw( priv_on )],
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( priv_type )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( role )},
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( priv_on )},
+	},
+	'domain' => {
+		$TPI_AT_SEQUENCE => [qw( 
+			id schema name base_type num_precision num_scale num_octets num_unsigned 
+			max_octets max_chars store_fixed char_enc trim_white uc_latin lc_latin 
+			pad_char trim_pad calendar with_zone range_min range_max 
+		)],
+		$TPI_AT_LITERALS => {
+			'name' => 'cstr',
+			'num_precision' => 'uint',
+			'num_scale' => 'uint',
+			'num_octets' => 'uint',
+			'num_unsigned' => 'bool',
+			'max_octets' => 'uint',
+			'max_chars' => 'uint',
+			'store_fixed' => 'bool',
+			'trim_white' => 'bool',
+			'uc_latin' => 'bool',
+			'lc_latin' => 'bool',
+			'pad_char' => 'cstr',
+			'trim_pad' => 'bool',
+			'with_zone' => 'sint',
+			'range_min' => 'misc',
+			'range_max' => 'misc',
+		},
+		$TPI_AT_ENUMS => {
+			'base_type' => 'simple_data_type',
+			'char_enc' => 'char_enc_type',
+			'calendar' => 'calendar',
+		},
+		$TPI_AT_NREFS => {
+			'schema' => 'schema',
+		},
+		$TPI_P_NODE_ATNMS => [qw( schema )],
+		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
+		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( base_type )},
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( schema )},
+	},
+	'domain_opt' => {
+		$TPI_AT_SEQUENCE => [qw( 
+			id domain value 
+		)],
+		$TPI_AT_LITERALS => {
+			'value' => 'misc',
+		},
+		$TPI_AT_NREFS => {
+			'domain' => 'domain',
+		},
+		$TPI_P_NODE_ATNMS => [qw( domain )],
+		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( value )},
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( domain )},
 	},
 	'sequence' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -471,26 +497,6 @@ my %NODE_TYPES = (
 		$TPI_P_NODE_ATNMS => [qw( table_ind )],
 		$TPI_MA_NREFS => {map { ($_ => 1) } qw( table_ind table_col )},
 	},
-	'trigger' => {
-		$TPI_AT_SEQUENCE => [qw( 
-			id table run_before run_after run_instead on_insert on_update on_delete for_each_row
-		)],
-		$TPI_AT_LITERALS => {
-			'run_before' => 'bool',
-			'run_after' => 'bool',
-			'run_instead' => 'bool',
-			'on_insert' => 'bool',
-			'on_update' => 'bool',
-			'on_delete' => 'bool',
-			'for_each_row' => 'bool',
-		},
-		$TPI_AT_NREFS => {
-			'table' => 'table',
-		},
-		$TPI_P_NODE_ATNMS => [qw( table )],
-		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( run_before run_after run_instead on_insert on_update on_delete for_each_row )},
-		$TPI_MA_NREFS => {map { ($_ => 1) } qw( table )},
-	},
 	'view' => {
 		$TPI_AT_SEQUENCE => [qw( 
 			id view_context view_type schema name application routine p_view 
@@ -513,6 +519,7 @@ my %NODE_TYPES = (
 			'p_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( schema application routine p_view )],
+		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( view_context view_type )},
 	},
 	'view_arg' => {
@@ -547,6 +554,17 @@ my %NODE_TYPES = (
 		$TPI_P_NODE_ATNMS => [qw( view )],
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_NREFS => {map { ($_ => 1) } qw( view )},
+	},
+	'view_src_arg' => {
+		$TPI_AT_SEQUENCE => [qw( 
+			id src match_view_arg
+		)],
+		$TPI_AT_NREFS => {
+			'src' => 'view_src',
+			'match_view_arg' => 'view_arg',
+		},
+		$TPI_P_NODE_ATNMS => [qw( src )],
+		$TPI_MA_NREFS => {map { ($_ => 1) } qw( src match_view_arg )},
 	},
 	'view_src_col' => {
 		$TPI_AT_SEQUENCE => [qw( 
@@ -630,8 +648,8 @@ my %NODE_TYPES = (
 	},
 	'view_expr' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id expr_type p_expr view view_part view_col 
-			set_view_col lit_val src_col match_col view_arg routine_arg routine_var domain sequence 
+			id expr_type p_expr view view_part view_col set_view_col view_src_arg 
+			lit_val src_col match_col view_arg routine_arg routine_var domain sequence 
 			call_view call_view_arg call_sfunc call_ufunc call_ufunc_arg catalog_link
 		)],
 		$TPI_AT_LITERALS => {
@@ -647,6 +665,7 @@ my %NODE_TYPES = (
 			'view' => 'view',
 			'view_col' => 'view_col',
 			'set_view_col' => 'view_src_col',
+			'view_src_arg' => 'view_src_arg',
 			'src_col' => 'view_src_col',
 			'match_col' => 'view_col',
 			'view_arg' => 'view_arg',
@@ -665,29 +684,33 @@ my %NODE_TYPES = (
 	},
 	'routine' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine_type schema trigger application p_routine name return_var_type return_domain
+			id routine_type schema application p_routine table view 
+			name return_var_type return_domain trigger_event trigger_per_row
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
+			'trigger_per_row' => 'bool',
 		},
 		$TPI_AT_ENUMS => {
 			'routine_type' => 'routine_type',
 			'return_var_type' => 'basic_var_type',
+			'trigger_event' => 'basic_trigger_event',
 		},
 		$TPI_AT_NREFS => {
 			'schema' => 'schema',
-			'trigger' => 'trigger',
 			'application' => 'application',
 			'p_routine' => 'routine',
+			'table' => 'table',
+			'view' => 'view',
 			'return_domain' => 'domain',
 		},
-		$TPI_P_NODE_ATNMS => [qw( schema trigger application p_routine )],
+		$TPI_P_NODE_ATNMS => [qw( schema application p_routine table view )],
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( routine_type )},
 	},
 	'routine_arg' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine name var_type domain
+			id routine name var_type domain curs_view 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
@@ -698,6 +721,7 @@ my %NODE_TYPES = (
 		$TPI_AT_NREFS => {
 			'routine' => 'routine',
 			'domain' => 'domain',
+			'curs_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
@@ -705,12 +729,13 @@ my %NODE_TYPES = (
 	},
 	'routine_var' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine name var_type domain init_lit_val curs_view is_constant 
+			id routine name var_type domain init_lit_val is_constant curs_view curs_for_update 
 		)],
 		$TPI_AT_LITERALS => {
 			'name' => 'cstr',
 			'init_lit_val' => 'misc',
 			'is_constant' => 'bool',
+			'curs_for_update' => 'bool',
 		},
 		$TPI_AT_ENUMS => {
 			'var_type' => 'basic_var_type',
@@ -727,7 +752,9 @@ my %NODE_TYPES = (
 	},
 	'routine_stmt' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id routine stmt_type dest_arg dest_var call_sproc call_uproc catalog_link c_routine c_view 
+			id routine stmt_type dest_arg dest_var 
+			call_sproc curs_arg curs_var view_for_dml 
+			call_uproc catalog_link c_routine 
 		)],
 		$TPI_AT_ENUMS => {
 			'stmt_type' => 'basic_stmt_type',
@@ -737,10 +764,12 @@ my %NODE_TYPES = (
 			'routine' => 'routine',
 			'dest_arg' => 'routine_arg',
 			'dest_var' => 'routine_var',
+			'curs_arg' => 'routine_arg',
+			'curs_var' => 'routine_var',
+			'view_for_dml' => 'view',
 			'call_uproc' => 'routine',
 			'catalog_link' => 'catalog_link',
 			'c_routine' => 'routine',
-			'c_view' => 'view',
 		},
 		$TPI_P_NODE_ATNMS => [qw( routine )],
 		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( stmt_type )},
@@ -2111,16 +2140,18 @@ included.)  However, here are a few example usage lines:
 	eval {
 		my $model = SQL::SyntaxModel->new_container();
 
+		# ... add a few Nodes
+
 		# Create user-defined data type domain that our database record primary keys are:
 		my $dom_entity_id = SQL::SyntaxModel->new_node( 'domain' );
 		$dom_entity_id->set_node_id( 1 );
 		$dom_entity_id->put_in_container( $model );
 		$dom_entity_id->add_reciprocal_links();
+		$dom_entity_id->set_node_ref_attribute( 'schema', $schema );
+		$dom_entity_id->set_parent_node_attribute_name( 'schema' );
 		$dom_entity_id->set_literal_attribute( 'name', 'entity_id' );
 		$dom_entity_id->set_enumerated_attribute( 'base_type', 'NUM_INT' );
 		$dom_entity_id->set_literal_attribute( 'num_precision', 9 );
-
-		# ... add a few more Nodes
 
 		# Define the table that holds our data:
 		my $tb_person = $pp_node->new_node( 'table' );
@@ -2171,14 +2202,13 @@ This is a serialization of the model that the test code makes, which should
 give you a better idea what kind of information is stored in a SQL::SynaxModel:
 
 	<root>
-		<elements>
-			<domain id="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
-			<domain id="2" name="person_name" base_type="STR_CHAR" max_chars="100" />
-		</elements>
+		<elements />
 		<blueprints>
 			<catalog id="1">
 				<owner id="1" catalog="1" />
 				<schema id="1" catalog="1" name="gene" owner="1">
+					<domain id="1" schema="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
+					<domain id="2" schema="1" name="person_name" base_type="STR_CHAR" max_chars="100" />
 					<table id="1" schema="1" name="person">
 						<table_col id="1" table="1" name="person_id" domain="1" mandatory="1" default_val="1" auto_inc="1" />
 						<table_col id="2" table="1" name="name" domain="2" mandatory="1" />
@@ -2204,7 +2234,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
 				<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-					<view id="2" view_context="ROUTINE" view_type="MATCH" routine="1" match_all_cols="1">
+					<view id="2" view_context="ROUTINE" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
 						<view_src id="3" view="2" name="person" match_table="1" />
 					</view>
 					<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
@@ -2220,7 +2250,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					<routine_arg id="11" routine="9" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="12" routine="9" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="13" routine="9" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="14" view_context="ROUTINE" view_type="MATCH" routine="9">
+					<view id="14" view_context="ROUTINE" view_type="MATCH" name="insert_a_person" routine="9">
 						<view_src id="15" view="14" name="person" match_table="1">
 							<view_src_col id="16" src="15" match_table_col="1" />
 							<view_src_col id="17" src="15" match_table_col="2" />
@@ -2232,14 +2262,14 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 						<view_expr id="22" expr_type="ARG" view="14" view_part="SET" set_view_col="18" routine_arg="12" />
 						<view_expr id="23" expr_type="ARG" view="14" view_part="SET" set_view_col="19" routine_arg="13" />
 					</view>
-					<routine_stmt id="24" routine="9" stmt_type="SPROC" call_sproc="INSERT" c_view="14" />
+					<routine_stmt id="24" routine="9" stmt_type="SPROC" call_sproc="INSERT" view_for_dml="14" />
 				</routine>
 				<routine id="25" routine_type="ANONYMOUS" application="2" name="update_a_person">
 					<routine_arg id="26" routine="25" name="arg_person_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="30" view_context="ROUTINE" view_type="MATCH" routine="25">
+					<view id="30" view_context="ROUTINE" view_type="MATCH" name="update_a_person" routine="25">
 						<view_src id="31" view="30" name="person" match_table="1">
 							<view_src_col id="32" src="31" match_table_col="1" />
 							<view_src_col id="33" src="31" match_table_col="2" />
@@ -2254,11 +2284,11 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 							<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
 						</view_expr>
 					</view>
-					<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" c_view="30" />
+					<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="30" />
 				</routine>
 				<routine id="43" routine_type="ANONYMOUS" application="2" name="delete_a_person">
 					<routine_arg id="44" routine="43" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<view id="45" view_context="ROUTINE" view_type="MATCH" routine="43">
+					<view id="45" view_context="ROUTINE" view_type="MATCH" name="delete_a_person" routine="43">
 						<view_src id="46" view="45" name="person" match_table="1">
 							<view_src_col id="47" src="46" match_table_col="1" />
 						</view_src>
@@ -2267,7 +2297,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 							<view_expr id="50" expr_type="ARG" p_expr="48" routine_arg="44" />
 						</view_expr>
 					</view>
-					<routine_stmt id="51" routine="43" stmt_type="SPROC" call_sproc="DELETE" c_view="45" />
+					<routine_stmt id="51" routine="43" stmt_type="SPROC" call_sproc="DELETE" view_for_dml="45" />
 				</routine>
 			</application>
 		</blueprints>

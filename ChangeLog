@@ -1,3 +1,51 @@
+2004-05-12   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.31.
+
+	* Multiple corresponding updates in Language.pod and SyntaxModel.pm (now
+	v0.18) that are partly of the re-ordering type.  Some are incompatible.
+
+	* Now 'domain' Nodes are catalog schema objects like tables or sequence
+	generators; they have 'schema' Nodes as their primary parents, and they
+	exist in the 'blueprints' portion of the Node tree rather than 'elements'.
+	As a result of this change, you can generate schema-specific named domains
+	rather than just inlining their data type definitions in such places as
+	table column definitions.  Domain-related documentation has also been moved
+	to a location further down, just above that for sequence generators.
+
+	* Removed the 'trigger' Node type and merged its attributes into the
+	'routine' Node type.  Now routines that are triggers can be direct child
+	Nodes of tables or views (triggers on views were not supported before).  
+	Added new enumerated type 'basic_trigger_event' that is used by the new 
+	'routine' in place of six boolean flags that the old 'trigger' used.  
+	The old solution let you write a trigger once and have it run under 
+	multiple circumstances; the new solution requires you to pick just one 
+	event (eg before insert), as SQL-2003 requires.
+
+	* Added 'view_src_arg' Node type which allows named subqueries to be passed
+	arguments when they are used in a view's "from" clause.  Also added 'FROM'
+	to the 'view_part' enumerated value list, and added new attribute
+	'view_src_arg' to 'view_expr' Nodes.
+
+	* Added a set of command_type enumerated values for working with named 
+	schemas and domains (list, add, remove, etc).
+
+	* Split the 'privilege' Node into 'privilege_on' and 'privilege_for' Nodes;
+	the second is a child Node of the first.  Added a few more attributes to
+	'privilege_on' Nodes.  Added a few privilege_type enumerated values.
+
+	* The 'name' attribute of "schema" and "view" Nodes is now mandatory.
+
+	* Added curs_view attribute to routine_arg Nodes.  Added curs_for_update 
+	attribute to routine_var Nodes.  With routine_stmt Nodes, renamed c_view 
+	attribute to view_for_dml, and added curs_arg/var attributes.
+
+	* Added comment by view_expr Nodes regarding the INTO clause.
+
+	* Updated t_SQL_SyntaxModel.pm and the SYNOPSIS in SyntaxModel.pm to
+	account for the move of 'domain' from 'elements' to 'schema', and the
+	rename of 'c_view' to 'view_for_dml', and the now mandatory view names.
+
 2004-05-01   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.30.
@@ -11,7 +59,7 @@
 	* Multiple corresponding updates in Language.pod and SyntaxModel.pm (now
 	v0.17) that are partly influenced by my close studying of the SQL-2003
 	standard, and partly by my attempts to build a SQL generator.  
-	
+
 	* Updated documentation to say that the SQL-2003 standard is now the focus 
 	of influence rather than SQL-1999 (or SQL-1992).
 
@@ -38,7 +86,7 @@
 	ABS.  Removed MIN, MAX, AVG as non-aggregate functions.  Removed CROWID, 
 	CROWNUM, CLEVEL, which will be replaced later.  Renamed the G* aggregate 
 	functions to the same names minus the leading 'G'.  Added EXISTS.
-	
+
 	* Added documentation regarding the recursiveness of views.
 
 	* The 'name' attribute of "routine" Nodes is now mandatory.

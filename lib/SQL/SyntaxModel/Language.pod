@@ -249,14 +249,15 @@ they describe completely the composition and behaviour of your database schemas
 and application-level routines that talk to them.  For all intents and
 purposes, they are part of your core application code and would get distributed
 as such; like your core application code, everyone's installation will be
-identical.  We keep simple and widely re-used details in 'elements' such as
-column/variable data types or domains.  We describe most structures in
-'blueprints', including database tables (with constraints), arbitrarily complex
-database views, and various kinds of routines (such as stored procedures, user
-defined functions, and basic DML like selects, inserts, updates, deletes), both
-those stored in a database schema or in an application.  We can represent
-multiple database catalogs and applications at once, whether or not they talk 
-to each other; how they inter-relate is also represented.
+identical.  We keep simple and widely re-used details in 'elements'.  This used
+to include things such as column/variable data types or domains, but as of
+SQL::SyntaxModel v0.18 domains are under 'blueprints'.  We describe most
+structures in 'blueprints', including database tables (with constraints),
+arbitrarily complex database views, and various kinds of routines (such as
+stored procedures, user defined functions, and basic DML like selects, inserts,
+updates, deletes), both those stored in a database schema or in an application.
+ We can represent multiple database catalogs and applications at once, whether
+or not they talk to each other; how they inter-relate is also represented.
 
 The second two categories, 'tools' and 'sites', are effectively locale or
 site-specific configuration data, and each installation of your application
@@ -296,23 +297,22 @@ The node attribute 'r' indicates recursion, where a node can be a child of
 another of the same type (eg: a sub-query or sub-routine).
 
 	<root c="1">
-		<elements c="1">
-			<domain c="M">
-				<domain_opt c="M" />
-			</domain>
-		</elements>
+		<elements c="1" />
 		<blueprints c="1">
 			<catalog c="M">
 				<owner c="M" />
 				<catalog_link c="M" />
 				<schema c="M">
+					<domain c="M" />
 					<sequence c="M" />
 					<table c="M" />
 					<view c="M" r="Y" />
 					<routine c="M" r="Y" />
 				</schema>
 				<role c="M">
-					<privilege c="M" />
+					<privilege_on c="M">
+						<privilege_for c="M" />
+					</privilege_on>
 				</role>
 			</catalog>
 			<application c="M">
@@ -345,14 +345,16 @@ another of the same type (eg: a sub-query or sub-routine).
 		</circumventions>
 	</root>
 
+	<domain c="M">
+		<domain_opt c="M" />
+	</domain>
+
 	<table c="M">
 		<table_col c="M" />
 		<table_ind c="M">
 			<table_ind_col c="M" />
 		</table_ind>
-		<trigger c="M">
-			<routine c="1" r="Y" />
-		</trigger>
+		<routine c="M" r="Y" />
 	</table>
 
 	<view c="M" r="Y">
@@ -372,8 +374,9 @@ another of the same type (eg: a sub-query or sub-routine).
 		<view c="M" r="Y" />
 		<routine_arg c="M" />
 		<routine_var c="M" />
-		<routine_stmt c="M" r="Y" />
-		<routine_expr c="M" r="Y" />
+		<routine_stmt c="M" r="Y">
+			<routine_expr c="M" r="Y" />
+		</routine_stmt>
 	</routine>
 
 For the most part, each 'concept' shown in the tree above corresponds to a
@@ -544,6 +547,30 @@ used to store any literal whose type varies or isn't a bool or uint or cstr.
 
 These are the enumerated attribute types that SQL::SyntaxModel knows about.
 
+=head2 privilege_type
+
+These are the basic types of privileges that database roles can be granted, and
+that by extension users granted those roles can have.
+
+	ALL - user/role has all privileges possible for the associated object
+	SELECT - user may select rows from a table
+	DELETE - user may delete rows from a table
+	INSERT - user may insert rows into a table
+	UPDATE - user may update rows in a table
+
+The above options are understood.  These next options I'm less sure about, and 
+most of them aren't mentioned in section 12.3 (p739) of SQL-2003.
+
+	CONNECT - user may connect/open/attach to the catalog that is the parent of the role
+	EXECUTE - user may execute a routine
+	CREATE - user may create objects in a schema
+	ALTER - user may alter objects in a schema
+	DROP - user may drop objects in a schema
+
+Aside from ALL, SELECT, DELETE, INSERT, UPDATE, the SQL-2003 standard also 
+defines REFERENCES, USAGE, TRIGGER, UNDER, EXECUTE, but I don't yet understand 
+what most of these mean.
+
 =head2 simple_data_type
 
 These are the basic scalar data value types that table columns or view columns
@@ -600,21 +627,6 @@ simple_data_type is DATM_FULL or DATM_DATE (or perhaps DATM_TIME also).
 	JPN - the Japanese calendar
 
 	Note that some of these examples may be wrong for practical use and be changed later.
-
-=head2 privilege_type
-
-These are the basic types of privileges that database roles can be granted, and
-that by extension users granted those roles can have.  I<Incomplete list.>
-
-	CONNECT - user may connect/open/attach to the catalog that is the parent of the role
-	SELECT - user may select rows from a table
-	INSERT - user may insert rows into a table
-	UPDATE - user may update rows in a table
-	DELETE - user may delete rows from a table
-	EXECUTE - user may execute a routine
-	CREATE - user may create objects in a schema
-	ALTER - user may alter objects in a schema
-	DROP - user may drop objects in a schema
 
 =head2 table_index_type
 
@@ -710,6 +722,7 @@ These are the standard parts of a view/query definition that are not in the
 	RESULT - the result list at the top; one item per "view_col" per view
 	INTO   - when outer view is read from in a routine (select or fetch), this is the "into" part
 	SET    - when outer view used by an "insert" or "update", this is the "set" part
+	FROM   - when view source in "from" part is a named subquery with args, these are arg values
 	WHERE  - the SQL "where" part
 	GROUP  - the SQL "group by" part
 	HAVING - the SQL "having" part
@@ -851,15 +864,37 @@ routine types have names.
 
 	This list is probably missing some items.
 
+=head2 basic_trigger_event
+
+These are the basic event types that can cause a trigger routine to execute.
+
+	BEFR_INS - before insert
+	AFTR_INS - after insert
+	INST_INS - instead of insert
+	BEFR_UPD - before update
+	AFTR_UPD - after update
+	INST_UPD - instead of update
+	BEFR_DEL - before delete
+	AFTR_DEL - after delete
+	INST_DEL - instead of delete
+
+	Note: Some databases (eg: SQLServer 2000) can let a trigger run "instead" of the triggering 
+	event, though the SQL-2003 standard does not mention such a feature.
+
+	Note: It appears that triggers (in Oracle at least) can have names and a much more complicated 
+	condition as its "event"; it also can be attached to things other than tables.
+	It can also exist in a separate schema.  Keep that in mind for a future update.  
+	See this: http://www.cit.uws.edu.au/docs/oracle/sqlref/ch4h.htm
+
 =head2 basic_stmt_type
 
 These are the basic statement types that routines can contain.  Examples of
 statements are calls to stored procedures or some kinds of program logic
 control operations or value assignment operations.
 
+	ASSIGN - an assignment of an expression value to a variable
 	SPROC  - a call to a standard built-in procedure; one of standard_proc
 	UPROC  - a call to a user defined stored procedure (routine)
-	ASSIGN - an assignment of an expression value to a variable
 	LOGIC  - some control-flow logic operation ...
 
 	Note: For the moment we will consider DML activity like [select, insert,
@@ -964,34 +999,48 @@ These commands must be called in a "transaction" context and destroy that contex
 
 These commands must be called in a "transaction" context:
 
+	SCHEMA_LIST   - fetches a list of schemas of open db instance
+	SCHEMA_INFO   - fetches some detailed info about a schemas
+	SCHEMA_VERIFY - compares a provided schema spec to an actual schemas
+	SCHEMA_CREATE - creates a new schema in catalog of open db inst
+	SCHEMA_DELETE - deletes an existing schema in open db inst (if it can)
+	SCHEMA_CLONE  - creates a clone of an existing schema with different name
+	SCHEMA_UPDATE - alters details for an existing schema
+	DOMAIN_LIST   - fetches a list of domains of open db instance
+	DOMAIN_INFO   - fetches some detailed info about a domain
+	DOMAIN_VERIFY - compares a provided domain spec to an actual domain
+	DOMAIN_CREATE - creates a new domain in schema of open db inst
+	DOMAIN_DELETE - deletes an existing domain in open db inst (if it can)
+	DOMAIN_CLONE  - creates a clone of an existing domain with different name
+	DOMAIN_UPDATE - alters details for an existing domain
 	SEQU_LIST    - fetches a list of sequence generators in schema of open db instance
 	SEQU_INFO    - fetches some detailed info about a sequence
 	SEQU_VERIFY  - compares a provided sequence generator spec to an actual table
 	SEQU_CREATE  - creates a new sequence generator in schema of open db inst
 	SEQU_DELETE  - deletes an existing sequence generator in open db inst (if it can)
 	SEQU_CLONE   - creates a clone of an existing sequence with different name
-	SEQU_UPDATE  - alters schema for an existing sequence generator
+	SEQU_UPDATE  - alters details for an existing sequence generator
 	TABLE_LIST   - fetches a list of tables in schema of open db instance
 	TABLE_INFO   - fetches some detailed info about a table
 	TABLE_VERIFY - compares a provided table spec to an actual table
 	TABLE_CREATE - creates a new table in schema of open db inst
 	TABLE_DELETE - deletes an existing table in open db inst (if it can)
 	TABLE_CLONE  - creates a clone of an existing table with different name
-	TABLE_UPDATE - alters schema for an existing table
+	TABLE_UPDATE - alters details for an existing table
 	VIEW_LIST    - fetches a list of views in schema of open db instance
 	VIEW_INFO    - fetches some detailed info about a view
 	VIEW_VERIFY  - compares a provided view spec to an actual view
 	VIEW_CREATE  - creates a new view in schema of open db inst
 	VIEW_DELETE  - deletes an existing view in open db inst (if it can)
 	VIEW_CLONE   - creates a clone of an existing view with different name
-	VIEW_UPDATE  - alters schema for an existing view
+	VIEW_UPDATE  - alters details for an existing view
 	ROUTINE_LIST   - fetches a list of routines/procs/funcs of open db instance
 	ROUTINE_INFO   - fetches some detailed info about a routine
 	ROUTINE_VERIFY - compares a provided routine spec to an actual routine
 	ROUTINE_CREATE - creates a new routine in schema of open db inst
 	ROUTINE_DELETE - deletes an existing routine in open db inst (if it can)
 	ROUTINE_CLONE  - creates a clone of an existing routine with different name
-	ROUTINE_UPDATE - alters schema for an existing routine
+	ROUTINE_UPDATE - alters details for an existing routine
 	USER_LIST    - fetches a list of users in open db instance
 	USER_INFO    - fetches some detailed info about a database user
 	USER_VERIFY  - compares a provided user spec to an actual user
@@ -1072,120 +1121,6 @@ in 0.10) which stored important sequence numbers.  If these same Nodes were
 stored in an RDBMS, then extra columns may need to be added to remember their
 sequence, which an RDBMS does not natively do.  Whereas, if the Nodes were
 stored in XML format, you won't need to add anything, as XML preserves order.>
-
-=head2 domain
-
-This type of Node describes a named user-defined customization of a base
-simple_data_type, the latter of which SQL::SyntaxModel recognizes in code. This
-customization encompases several things: 1. The domain has its own name /
-identifier that can be referenced by entities such as table column definitions,
-view column definitions, and routine variables, as their "data type"; 2. The
-domain can impose restrictions within the base data type as to what values can
-be stored (eg: a STR_CHAR may only be 30 characters long, or a NUM_EXA may only
-be 5 digits wide with 2 digits on the right of the radix point); 3. The
-domain can define simple pre or post processing of values, such as trimming of
-bounding whitespace or uppercasing its contents.
-
-For example, the user may decide to create a custom data type called
-"currency", which is a decimal number of precision 15 and a scale of 2.  Or,
-they may want to have an "ip address" type, which is a string that can hold 15
-characters (how ips are normally displayed to humans).  Or, they may want a
-custom SIN or telephone-no or person-name type.  They can then refer to these
-custom types everywhere as if they were types built-in to the database.
-
-Note that SQL::SyntaxModel does not support the antiquated notion of having
-separate fixed-width and variable-width character strings as being distinct
-base data types.  That is an implementation detail which database products
-should not expose in the user interface, or if they do, it should be demoted to
-an "optimization" feature used with a single character string type.  When you
-make a domain using the STR_CHAR base_type, it will have the semantics of
-SQL's "VARCHAR" by default; you can make it like "CHAR" by setting the
-store_fixed attribute to true.
-
-Attribute List:
-
-	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	name - L.cstr - MA - name of the user customized data type
-	base_type - E.simple_data_type - MA - name of the base data type this data_type is customized from
-	num_precision - L.uint - max length in digits for exact number, or count of significant digits for inexact 
-	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the radix point
-	num_octets - L.uint - for integral or inexact (floating point) numbers, fixed storage size in octets
-	num_unsigned - L.bool - for numbers, true means only values >= 0 may be stored
-	max_octets - L.uint - MC(base_type=STR_BIT) - maximum size in octets for a binary/bit string
-	max_chars - L.uint - MC(base_type=STR_CHAR) - maximum size in characters for a character string
-	store_fixed - L.bool - when true then try to reserve max size on disk even if not all used
-	char_enc - E.char_enc_type - MC(base_type=STR_CHAR) - which character encoding to use
-	trim_white - L.bool - when true then trim lead/trailing whitespace on save into STR_CHAR field/var
-	uc_latin - L.bool - do we uppercase latin chars in STR_CHAR before writing (no change on reading)
-	lc_latin - L.bool - do we lowercase latin chars in STR_CHAR before writing (no change on reading)
-	pad_char - L.cstr - when store_fixed is true then pad actual value with this to max size on save
-	trim_pad - L.bool - when store_fixed is true then trim padding on read from STR_CHAR field/var
-	calendar - E.calendar - MC(base_type=DATM_FULL,DATM_DATE) - what calendar the date and time (or date only) is in
-	with_zone - L.sint - if timestamp/time to include a 'with time zone', this says what time zone
-	range_min - L.misc - when applicable, what the allowed minimum value is (for bounds/check constraint)
-	range_max - L.misc - when applicable, what the allowed maximum value is (for bounds/check constraint)
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_name - [name]
-
-Example List:
-
-	|id|name    |base     |np |ns|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
-	|--|--------|---------|---|--|--|--|-----|----|--|-----|--|--|--|--|---|
-	| 1|bin1k   |STR_BIT  |   |  |  |  | 1000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 1000 octets
-	| 2|bin32k  |STR_BIT  |   |  |  |  |32000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 32000 octets
-	| 3|str4    |STR_CHAR |   |  |  |  |     |   4|1 |ASCII|1 |1 |20|1 |   | - a fix-w 4 char ascii cstr, uppercased, spc-pad
-	| 4|str10   |STR_CHAR |   |  |  |  |     |  10|1 |ASCII|1 |  |20|1 |   | - a fix-w 10 char ascii cstr, case-preserve, spc-pad
-	| 5|str30   |STR_CHAR |   |  |  |  |     |  30|  |ASCII|1 |  |  |  |   | - a fix-w 30 char ascii cstr, case-preserving
-	| 6|str2k   |STR_CHAR |   |  |  |  |     |2000|  |UTF8 |  |  |  |  |   | - a var-w 2000 char unicode cstr, case-preserving
-	| 7|byte    |NUM_INT  |   |  | 1|  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
-	| 8|short   |NUM_INT  |   |  | 2|  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
-	| 9|int     |NUM_INT  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
-	|10|long    |NUM_INT  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
-	|11|ubyte   |NUM_INT  |   |  | 1|1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
-	|12|ushort  |NUM_INT  |   |  | 2|1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
-	|13|uint    |NUM_INT  |   |  | 4|1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
-	|14|ulong   |NUM_INT  |   |  | 8|1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
-	|15|float   |NUM_APR  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit imprecise fractional number
-	|16|double  |NUM_APR  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit imprecise fractional number
-	|17|dec10p2 |NUM_EXA  | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths scale
-	|18|dec255  |NUM_EXA  |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary scale
-	|19|boolean |BOOLEAN  |   |  |  |  |     |    |  |     |  |  |  |  |   | - a boolean; only 2 values of false or true
-	|20|datetime|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |ABS| - a date and time or date, non-calendar specific
-	|21|dtchines|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |CHI| - a date and time or date, in the Chinese calendar
-	|22|sex     |STR_CHAR |   |  |  |  |     |   1|  |     |  |  |  |  |   | - a 1-char string, constrained to 'M' and 'F'
-	|23|str20   |STR_CHAR |   |  |  |  |     |  20|  |     |  |  |  |  |   | - a 20-char string
-	|24|str100  |STR_CHAR |   |  |  |  |     | 100|  |     |  |  |  |  |   | - a 100-char string
-	|25|str250  |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a 250-char string
-	|26|entitynm|STR_CHAR |   |  |  |  |     |  30|  |     |  |  |  |  |   | - a short string suitable for naming things
-	|27|generic |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a longer string that most kinds of data will fit in
-
-=head2 domain_opt
-
-When a "domain" Node is meant to impose an enumerated list restriction, meaning 
-that only a specific set of values may be stored, then you use a "domain_opt" 
-Node to define each enumerated value that is allowed.  Keep in mind that the 
-SQL NULL (undefined) value is always distinct from anything in this option list.
-
-Attribute List:
-
-	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	domain - N.domain - MA - what "domain" Node this option is associated with
-	value - L.misc - MA - this is the actual enumerated value that the domain_opt Node represents
-
-Unique Constraint List:
-
-	primary - [id]
-	ak_option - [domain,value]
-
-Example List:
-
-	|id|do|v|
-	|--|--|-|
-	| 1|22|M| - "sex" is "Male"
-	| 2|22|F| - "sex" is "Female"
 
 =head2 catalog
 
@@ -1329,8 +1264,8 @@ Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	catalog - N.catalog - MA - the catalog that this schema/namespace is in
-	name - L.cstr - the name this schema/namespace is identified by
-	owner - N.user - MA - the user that owns this schema
+	name - L.cstr - MA - the name this schema/namespace is identified by
+	owner - N.owner - MA - the user that owns this schema
 
 Unique Constraint List:
 
@@ -1341,7 +1276,7 @@ Example List:
 
 	|id|ca|name|ow|
 	|--|--|----|--|
-	| 1| 1|    | 1| - a default schema/namespace, usually just used if it is the only schema/namespace
+	| 1| 1|foo | 1| - a default schema/namespace
 	| 2| 2|gene| 2| - store all the normal app data that constitutes a genealogy database
 	| 3| 2|dd  | 2| - store a data dictionary describing an application for editing gene data
 
@@ -1361,23 +1296,158 @@ Unique Constraint List:
 	primary - [id]
 	ak_name - [catalog,name]
 
-=head2 privilege
+=head2 privilege_on
 
-This type of Node describes a specific privilege that is assigned to a role;
-all users given that role will have this privilege.  I<Details to be edited.>
+This type of Node associates a role with some entity (usually a schema or
+schema object) on which it has some kind of privileges; privilege_on Nodes are
+children of role Nodes. All users given that role will have these privileges. 
+Exactly what privileges on the entity the role has are defined by child
+privilege_for Nodes, which are children of the privilege_on Node.
 
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	role - N.role - MA - the role that this privilege is granted to
-	priv_type - E.privilege_type - MA - what manner of privilege this is
 	schema - N.schema - if the privilege relates to a whole schema, this is the schema
+	domain - N.domain - if the privilege type is domain-related, this is the domain
+	sequence - N.sequence - if the privilege type is sequence-related, this is the sequence
 	table - N.table - if the privilege type is table-related, this is the table
 	routine - N.routine - if the privilege type is routine-related, this is the routine
 
 Unique Constraint List:
 
 	primary - [id]
+
+=head2 privilege_for
+
+This type of Node details one privilege that a role has on some other entity
+that is defined by this Node's privilege_on parent Node.
+
+Attribute List:
+
+	id - NODE_ID - MA - unique identifier for each Node within this Node Type
+	priv_on - N.privilege_on - MA - what "privilege_on" Node this option is associated with
+	priv_type - E.privilege_type - MA - what manner of privilege this is
+
+Unique Constraint List:
+
+	primary - [id]
+	ak_option - [priv_on,priv_type]
+
+=head2 domain
+
+This type of Node describes a named user-defined customization of a base
+simple_data_type, the latter of which SQL::SyntaxModel recognizes in code. This
+customization encompases several things: 1. The domain has its own name /
+identifier that can be referenced by entities such as table column definitions,
+view column definitions, and routine variables, as their "data type"; 2. The
+domain can impose restrictions within the base data type as to what values can
+be stored (eg: a STR_CHAR may only be 30 characters long, or a NUM_EXA may only
+be 5 digits wide with 2 digits on the right of the radix point); 3. The
+domain can define simple pre or post processing of values, such as trimming of
+bounding whitespace or uppercasing its contents.
+
+For example, the user may decide to create a custom data type called
+"currency", which is a decimal number of precision 15 and a scale of 2.  Or,
+they may want to have an "ip address" type, which is a string that can hold 15
+characters (how ips are normally displayed to humans).  Or, they may want a
+custom SIN or telephone-no or person-name type.  They can then refer to these
+custom types everywhere as if they were types built-in to the database.
+
+Note that SQL::SyntaxModel does not support the antiquated notion of having
+separate fixed-width and variable-width character strings as being distinct
+base data types.  That is an implementation detail which database products
+should not expose in the user interface, or if they do, it should be demoted to
+an "optimization" feature used with a single character string type.  When you
+make a domain using the STR_CHAR base_type, it will have the semantics of
+SQL's "VARCHAR" by default; you can make it like "CHAR" by setting the
+store_fixed attribute to true.
+
+Attribute List:
+
+	id - NODE_ID - MA - unique identifier for each Node within this Node Type
+	schema - N.schema - MA - the schema that this domain is in
+	name - L.cstr - MA - the name this domain (user customized data type) is identified by
+	base_type - E.simple_data_type - MA - name of the base data type this data_type is customized from
+	num_precision - L.uint - max length in digits for exact number, or count of significant digits for inexact 
+	num_scale - L.uint - for non-integral numbers, how many digits can be on the right of the radix point
+	num_octets - L.uint - for integral or inexact (floating point) numbers, fixed storage size in octets
+	num_unsigned - L.bool - for numbers, true means only values >= 0 may be stored
+	max_octets - L.uint - MC(base_type=STR_BIT) - maximum size in octets for a binary/bit string
+	max_chars - L.uint - MC(base_type=STR_CHAR) - maximum size in characters for a character string
+	store_fixed - L.bool - when true then try to reserve max size on disk even if not all used
+	char_enc - E.char_enc_type - MC(base_type=STR_CHAR) - which character encoding to use
+	trim_white - L.bool - when true then trim lead/trailing whitespace on save into STR_CHAR field/var
+	uc_latin - L.bool - do we uppercase latin chars in STR_CHAR before writing (no change on reading)
+	lc_latin - L.bool - do we lowercase latin chars in STR_CHAR before writing (no change on reading)
+	pad_char - L.cstr - when store_fixed is true then pad actual value with this to max size on save
+	trim_pad - L.bool - when store_fixed is true then trim padding on read from STR_CHAR field/var
+	calendar - E.calendar - MC(base_type=DATM_FULL,DATM_DATE) - what calendar the date and time (or date only) is in
+	with_zone - L.sint - if timestamp/time to include a 'with time zone', this says what time zone
+	range_min - L.misc - when applicable, what the allowed minimum value is (for bounds/check constraint)
+	range_max - L.misc - when applicable, what the allowed maximum value is (for bounds/check constraint)
+
+Unique Constraint List:
+
+	primary - [id]
+	ak_name - [schema,name]
+
+Example List:
+
+	|id|name    |base     |np |ns|no|nu|mxoct|mxch|fx|chenc|tw|uc|pc|tp|cal|
+	|--|--------|---------|---|--|--|--|-----|----|--|-----|--|--|--|--|---|
+	| 1|bin1k   |STR_BIT  |   |  |  |  | 1000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 1000 octets
+	| 2|bin32k  |STR_BIT  |   |  |  |  |32000|    |  |     |  |  |  |  |   | - a hunk of binary data of maximum 32000 octets
+	| 3|str4    |STR_CHAR |   |  |  |  |     |   4|1 |ASCII|1 |1 |20|1 |   | - a fix-w 4 char ascii cstr, uppercased, spc-pad
+	| 4|str10   |STR_CHAR |   |  |  |  |     |  10|1 |ASCII|1 |  |20|1 |   | - a fix-w 10 char ascii cstr, case-preserve, spc-pad
+	| 5|str30   |STR_CHAR |   |  |  |  |     |  30|  |ASCII|1 |  |  |  |   | - a fix-w 30 char ascii cstr, case-preserving
+	| 6|str2k   |STR_CHAR |   |  |  |  |     |2000|  |UTF8 |  |  |  |  |   | - a var-w 2000 char unicode cstr, case-preserving
+	| 7|byte    |NUM_INT  |   |  | 1|  |     |    |  |     |  |  |  |  |   | - an 8-bit precise int btwn           -128 and           +127
+	| 8|short   |NUM_INT  |   |  | 2|  |     |    |  |     |  |  |  |  |   | - a 16-bit precise int btwn        -32,768 and        +32,767
+	| 9|int     |NUM_INT  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit precise int btwn -2,147,483,648 and +2,147,483,647
+	|10|long    |NUM_INT  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit precise int btwn        -(2^63) and      +(2^63)-1
+	|11|ubyte   |NUM_INT  |   |  | 1|1 |     |    |  |     |  |  |  |  |   | - an 8-bit precise integer between 0 and           +255
+	|12|ushort  |NUM_INT  |   |  | 2|1 |     |    |  |     |  |  |  |  |   | - a 16-bit precise integer between 0 and        +65,535
+	|13|uint    |NUM_INT  |   |  | 4|1 |     |    |  |     |  |  |  |  |   | - a 32-bit precise integer between 0 and +4,294,967,295
+	|14|ulong   |NUM_INT  |   |  | 8|1 |     |    |  |     |  |  |  |  |   | - a 64-bit precise integer between 0 and      +(2^64)-1
+	|15|float   |NUM_APR  |   |  | 4|  |     |    |  |     |  |  |  |  |   | - a 32-bit imprecise fractional number
+	|16|double  |NUM_APR  |   |  | 8|  |     |    |  |     |  |  |  |  |   | - a 64-bit imprecise fractional number
+	|17|dec10p2 |NUM_EXA  | 10| 2|  |  |     |    |  |     |  |  |  |  |   | - a precise 10-digit num with hundredths scale
+	|18|dec255  |NUM_EXA  |255|  |  |  |     |    |  |     |  |  |  |  |   | - a precise 255-digit num with arbitrary scale
+	|19|boolean |BOOLEAN  |   |  |  |  |     |    |  |     |  |  |  |  |   | - a boolean; only 2 values of false or true
+	|20|datetime|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |ABS| - a date and time or date, non-calendar specific
+	|21|dtchines|DATM_FULL|   |  |  |  |     |    |  |     |  |  |  |  |CHI| - a date and time or date, in the Chinese calendar
+	|22|sex     |STR_CHAR |   |  |  |  |     |   1|  |     |  |  |  |  |   | - a 1-char string, constrained to 'M' and 'F'
+	|23|str20   |STR_CHAR |   |  |  |  |     |  20|  |     |  |  |  |  |   | - a 20-char string
+	|24|str100  |STR_CHAR |   |  |  |  |     | 100|  |     |  |  |  |  |   | - a 100-char string
+	|25|str250  |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a 250-char string
+	|26|entitynm|STR_CHAR |   |  |  |  |     |  30|  |     |  |  |  |  |   | - a short string suitable for naming things
+	|27|generic |STR_CHAR |   |  |  |  |     | 250|  |     |  |  |  |  |   | - a longer string that most kinds of data will fit in
+
+=head2 domain_opt
+
+When a "domain" Node is meant to impose an enumerated list restriction, meaning 
+that only a specific set of values may be stored, then you use a "domain_opt" 
+Node to define each enumerated value that is allowed.  Keep in mind that the 
+SQL NULL (undefined) value is always distinct from anything in this option list.
+
+Attribute List:
+
+	id - NODE_ID - MA - unique identifier for each Node within this Node Type
+	domain - N.domain - MA - what "domain" Node this option is associated with
+	value - L.misc - MA - this is the actual enumerated value that the domain_opt Node represents
+
+Unique Constraint List:
+
+	primary - [id]
+	ak_option - [domain,value]
+
+Example List:
+
+	|id|do|v|
+	|--|--|-|
+	| 1|22|M| - "sex" is "Male"
+	| 2|22|F| - "sex" is "Female"
 
 =head2 sequence
 
@@ -1557,41 +1627,6 @@ Example List:
 	|12| 11| 24|  20| - link child to father
 	|13| 12| 25|  20| - link child to mother
 
-=head2 trigger
-
-This type of Node says when a table has an associated trigger, which is a
-special unnamed routine that executes automatically when certain kinds of DML
-activity happen to the table.  Triggers can be set to run before or after said
-activity, either once per SQL statement execution or once per each row worked
-on; they can run on inserts and/or updates and/or deletes.  The "routine" Node 
-has the "trigger" Node as its parent.
-
-Attribute List:
-
-	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	table - N.table - MA - unique identifier for the table to watch
-	run_before - L.bool - MA - true when the trigger should execute before attempted change is made
-	run_after - L.bool - MA - true when the trigger should execute after attempted change is made
-	run_instead - L.bool - MA - true when the trigger should execute instead of the attempted change
-	on_insert - L.bool - MA - true when trigger should execute when a record insert is attempted
-	on_update - L.bool - MA - true when trigger should execute when a record update is attempted
-	on_delete - L.bool - MA - true when trigger should execute when a record delete is attempted
-	for_each_row - L.bool - MA - true when trigger is re-executed for each row affected; false is once
-
-	Note: The name of a trigger (as required by SQL-2003) is defined in the 
-	routine Node that implements the trigger body.
-
-	Note: SQL-2003 seems to suggest triggers can attach to tables or named views.
-
-	Note: It appears that triggers (in Oracle at least) can have names and a much more complicated 
-	condition as its "event"; it also can be attached to things other than tables.
-	It can also exist in a separate schema.  Keep that in mind for a future update.  
-	See this: http://www.cit.uws.edu.au/docs/oracle/sqlref/ch4h.htm
-
-Unique Constraint List:
-
-	primary - [id]
-
 =head2 view
 
 This type of Node describes the core (single cardinality) description of a
@@ -1658,7 +1693,7 @@ Attribute List:
 	view_context - E.view_context - MA - what context this view expects to live in; eg: schema, cursor, application
 	view_type - E.view_type - MA - what kind of view this is; eg: match, single, mult, compound, has-subq, recursive
 	schema - N.schema - MC(view_context=SCHEMA) - the schema that this view is in, if any
-	name - L.cstr - MC(view_context=SCHEMA|view_type=RECURSIVE) - the name this view is identified by, if any
+	name - L.cstr - MA - the name this view is identified by, if any
 	application - N.application - MC(view_context=APPLIC) - if view in app space, not app routine, an app is our parent
 	routine - N.routine - MC(view_context=ROUTINE) - parent view of this one, if any; empty if this is the root view
 	p_view - N.view - MC(view_context=INSIDE) - parent view of this one, if any; empty if this is the root view
@@ -1739,6 +1774,23 @@ Example List:
 	| 8| 5|m           |   |  1| - match "user" view
 	| 9| 6|m           |   |  2| - match "person_with_parents" view
 	|10| 7|m           |   |  3| - match "user_theme" view
+
+=head2 view_src_arg
+
+When a view_src matches a named subquery that has arguments, a view_src_arg
+Node is used to correlate a subquery view_arg for the view that uses the
+view_src.  This allows such named subqueries to be passed argument values when
+used in a "from" clause.
+
+Attribute List:
+
+	id - NODE_ID - MA - unique identifier for each Node within this Node Type
+	src - N.view_src - MA - which view source this column is associated with
+	match_view_arg - N.view_arg - MA - which argument in the source view is represented
+
+Unique Constraint List:
+
+	primary - [id]
 
 =head2 view_src_col
 
@@ -1971,8 +2023,9 @@ Attribute List:
 	p_expr - N.view_expr - parent expression of this one, if any; empty if this is the root expression
 	view - N.view - MC(!p_expr) - what view this expression has a part in defining
 	view_part - E.view_part - MC(!p_expr) - what "part" of a view definition this is defining
-	view_col - N.view_col - MC(view_part=RESULT) - the view interface/result column we are defining the value of
+	view_col - N.view_col - MC(view_part=RESULT|INTO) - the view interface/result column we are defining the value of
 	set_view_col - N.view_src_col - MC(view_part=SET) - this is the column we are setting the value of in insert or update op
+	view_src_arg - N.view_src_arg - MC(view_part=FROM) - arg of named subquery used in "from" we are passing value to
 	lit_val - L.misc - MC(expr_type=LIT) - the literal value of this expression
 	src_col - N.view_src_col - MC(expr_type=COL) - the source table/view column to read the value of
 	match_col - N.view_col - MC(expr_type=MCOL) - ref res col inst of src col; only MATCH views can in "where", all cn [hv,ord]
@@ -1988,47 +2041,53 @@ Attribute List:
 	call_ufunc_arg - N.routine_arg - if parent expr set call_ufunc, name routine arg that curr expr passes value to
 	catalog_link - N.catalog_link - if ufunc in another catalog, say via which catalog link
 
+	Note: When the view_part is INTO, the [view_col,routine_arg,routine_var] 
+	attributes are used to implement it, even though their own details don't 
+	say so.  The arg/var says what name to use for the expression, and the 
+	view_col is used so the view_expr nodes are output in the same order as 
+	the corresponding view_col Nodes are declared.
+
 Unique Constraint List:
 
 	primary - [id]
 
 Example List:
 
-	|id|cl|vw|part  |pe|type |lit  |blv|rta     |src|mtc|sf    |uf|
-	|--|--|--|------|--|-----|-----|---|--------|---|---|------|--|
-	| 1|  | 5|WHERE |  |SFUNC|     |   |        |   |   |EQ    |  | - standard function of "eq(a,b)"
-	| 2|  |  |      | 1|COL  |     |   |        | 30|   |      |  | - match column "user_auth"."user_id"
-	| 3|  |  |      | 1|ARG  |     |   |curr_uid|   |   |      |  | - value of bind var "curr_uid"
-	| 4|  | 6|WHERE |  |SFUNC|     |   |        |   |   |AND   |  | - standard function of "and(a,b)"
-	| 5|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE  |  | - standard function of "like(a,b)"
-	| 6|  |  |      | 5|COL  |     |   |        | 28|   |      |  | - match column "m"."father_name"
-	| 7|  |  |      | 5|ARG  |     |   |srchw_fa|   |   |      |  | - value of bind var "srchw_fa"
-	| 8|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE  |  | - standard function of "like(a,b)"
-	| 9|  |  |      | 8|COL  |     |   |        | 29|   |      |  | - match column "m"."mother_name"
-	|10|  |  |      | 8|ARG  |     |   |srchw_mo|   |   |      |  | - value of bind var "srchw_mo"
-	|11|  | 3|WHERE |  |SFUNC|     |   |        |   |   |EQ    |  | - standard function of "eq(a,b)"
-	|12|  |  |      |11|COL  |     |   |        | 23|   |      |  | - match column "user_pref"."pref_name"
-	|13|  |  |      |11|LIT  |theme|   |        |   |   |      |  | - match literal value of "theme"
-	|14|  | 3|GROUP |  |COL  |     |   |        | 24|   |      |  | - group by "user_pref"."pref_value"
-	|15|  | 3|HAVING|  |SFUNC|     |   |        |   |   |GT    |  | - standard function of "gt(a,b)"
-	|16|  |  |      |15|SFUNC|     |   |        |   |   |GCOUNT|  | - standard function of "gcount(col)"
-	|17|  |  |      |15|LIT  |    1|   |        |   |   |      |  | - match literal value of "theme"
-	|42|22| 3|RESULT|  |COL  |     |   |        | 24|   |      |  |
-	|43|23| 3|RESULT|  |SFUNC|     |   |        |   |   |GCOUNT|  |
-	|44|  |  |      |43|COL  |     |   |        | 24|   |      |  |
-	|51|  | 5|ORDER |  |COL  |     |   |        | 31|   |      |  |
-	|52|  | 6|ORDER |  |COL  |     |   |        | 27|   |      |  |
-	|53|  | 6|ORDER |  |COL  |     |   |        | 28|   |      |  |
-	|54|  | 6|ORDER |  |COL  |     |   |        | 29|   |      |  |
-	|55|  | 3|ORDER |  |MCOL |     |   |        |   | 23|      |  |
-	|56|  | 3|ORDER |  |MCOL |     |   |        |   | 22|      |  |
+	|id|cl|vw|part  |pe|type |lit  |blv|rta     |src|mtc|sf   |uf|
+	|--|--|--|------|--|-----|-----|---|--------|---|---|-----|--|
+	| 1|  | 5|WHERE |  |SFUNC|     |   |        |   |   |EQ   |  | - standard function of "eq(a,b)"
+	| 2|  |  |      | 1|COL  |     |   |        | 30|   |     |  | - match column "user_auth"."user_id"
+	| 3|  |  |      | 1|ARG  |     |   |curr_uid|   |   |     |  | - value of bind var "curr_uid"
+	| 4|  | 6|WHERE |  |SFUNC|     |   |        |   |   |AND  |  | - standard function of "and(a,b)"
+	| 5|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE |  | - standard function of "like(a,b)"
+	| 6|  |  |      | 5|COL  |     |   |        | 28|   |     |  | - match column "m"."father_name"
+	| 7|  |  |      | 5|ARG  |     |   |srchw_fa|   |   |     |  | - value of bind var "srchw_fa"
+	| 8|  |  |      | 4|SFUNC|     |   |        |   |   |LIKE |  | - standard function of "like(a,b)"
+	| 9|  |  |      | 8|COL  |     |   |        | 29|   |     |  | - match column "m"."mother_name"
+	|10|  |  |      | 8|ARG  |     |   |srchw_mo|   |   |     |  | - value of bind var "srchw_mo"
+	|11|  | 3|WHERE |  |SFUNC|     |   |        |   |   |EQ   |  | - standard function of "eq(a,b)"
+	|12|  |  |      |11|COL  |     |   |        | 23|   |     |  | - match column "user_pref"."pref_name"
+	|13|  |  |      |11|LIT  |theme|   |        |   |   |     |  | - match literal value of "theme"
+	|14|  | 3|GROUP |  |COL  |     |   |        | 24|   |     |  | - group by "user_pref"."pref_value"
+	|15|  | 3|HAVING|  |SFUNC|     |   |        |   |   |GT   |  | - standard function of "gt(a,b)"
+	|16|  |  |      |15|SFUNC|     |   |        |   |   |COUNT|  | - standard function of "count(col)"
+	|17|  |  |      |15|LIT  |    1|   |        |   |   |     |  | - match literal value of "theme"
+	|42|22| 3|RESULT|  |COL  |     |   |        | 24|   |     |  |
+	|43|23| 3|RESULT|  |SFUNC|     |   |        |   |   |COUNT|  |
+	|44|  |  |      |43|COL  |     |   |        | 24|   |     |  |
+	|51|  | 5|ORDER |  |COL  |     |   |        | 31|   |     |  |
+	|52|  | 6|ORDER |  |COL  |     |   |        | 27|   |     |  |
+	|53|  | 6|ORDER |  |COL  |     |   |        | 28|   |     |  |
+	|54|  | 6|ORDER |  |COL  |     |   |        | 29|   |     |  |
+	|55|  | 3|ORDER |  |MCOL |     |   |        |   | 23|     |  |
+	|56|  | 3|ORDER |  |MCOL |     |   |        |   | 22|     |  |
 
 	Notes: In Oracle notation: the first view says match where
 	"user_auth.user_id = :curr_uid", the second says match where "father.name
 	like '%'||:srchw_fa||'%' and mother.name like '%'||:srchw_mo||'%'", the
 	third says match where "user_pref.pref_name = 'theme'".
 
-	Notes: In Oracle notation: the third view says match having "count(*) > 1" ("gcount" has no args).
+	Notes: In Oracle notation: the third view says match having "count(*) > 1" ("count" has no args).
 
 	Notes: The example 'routine_var' values are actually incorrect and will be changed to id numbers.
 
@@ -2097,12 +2156,15 @@ Attribute List:
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
 	routine_type - E.routine_type - MA - what kind of routine this is
 	schema - N.schema - the schema that this routine is in, if any
-	trigger - N.trigger - if this routine is the body for a trigger, it is our parent Node
 	application - N.application - if routine is in the application space, an app is our parent
 	p_routine - N.routine - parent routine of this one, if any; empty if this is the root routine
-	name - L.cstr - MA - name routine ident by in a [schema, p_routine, app], or name of trigger it impl
+	table - N.table - if this routine is a trigger on a table, then this is the table to watch
+	view - N.view - if this routine is a trigger on a named view, then this is the view to watch
+	name - L.cstr - MA - name routine ident by in a [schema, p_routine, app], or name of trigger
 	return_var_type - E.basic_var_type - if this routine returns a value, this is its variable type
 	return_domain - N.domain - if this routine returns a value, this is its domain
+	trigger_event - E.basic_trigger_event - MC(routine_type=TRIGGER) - when a trigger executes
+	trigger_per_row - L.bool - MC(routine_type=TRIGGER) - true, exec each row, false, each stmt
 
 Unique Constraint List:
 
@@ -2119,7 +2181,8 @@ Attribute List:
 	routine - N.routine - MA - what routine this argument is for
 	name - L.cstr - MA - unique identifier for variable within view
 	var_type - E.basic_var_type - MA - what basic variable type the argument is
-	domain - N.domain - if the var type is 'scalar', this is its user customized data type
+	domain - N.domain - MC(var_type=SCALAR) - user customized data type of scalar arg
+	curs_view - N.view - MC(var_type=CURSOR) - put reference to the view defining this cursor here
 
 Unique Constraint List:
 
@@ -2138,10 +2201,11 @@ Attribute List:
 	routine - N.routine - MA - what routine this variable is in
 	name - L.cstr - MA - unique identifier for variable within view
 	var_type - E.basic_var_type - MA - what basic variable type the variable is
-	domain - N.domain - if the var type is 'scalar', this is its user customized data type
-	init_lit_val - L.misc - if var type is 'scalar', an initial value for var can go here
-	curs_view - N.view - if var type is 'cursor', then put the view defining it here
-	is_constant - L.bool - if the var type is 'scalar', this says its value may not be changed
+	domain - N.domain - MC(var_type=SCALAR) - user customized data type of scalar variable
+	init_lit_val - L.misc - if var type is SCALAR, an initial value for var can go here
+	is_constant - L.bool - if the var type is SCALAR, this says its value may not be changed
+	curs_view - N.view - MC(var_type=CURSOR) - put the view defining cursor here
+	curs_for_update - L.bool - if var type is SCALAR, true if select for update, false (def) if r/o
 
 Unique Constraint List:
 
@@ -2163,10 +2227,12 @@ Attribute List:
 	dest_arg - N.routine_arg - if the stmt type is 'assign', this 'out' arg is where the expression result goes
 	dest_var - N.routine_var - if the stmt type is 'assign', this var is where the expression result goes
 	call_sproc - E.standard_proc - MC(stmt_type=SPROC) - this is the standard built-in procedure to call
+	curs_arg - N.routine_arg - if SPROC stmt that works with CURSOR, this arg may have the cursor
+	curs_var - N.routine_var - if SPROC stmt that works with CURSOR, this var may have the cursor
+	view_for_dml - N.view - if the statement is an insert/update/delete/etc (non-cursor) defined by a view, name it here
 	call_uproc - N.routine - MC(stmt_type=UPROC) - this is the user-defined stored function (routine) to call
 	catalog_link - N.catalog_link - if uproc in another catalog, say via which catalog link
 	c_routine - N.routine - if the stmt type starts an unnamed routine context, this is the child routine id
-	c_view - N.view - if the statement is an insert/update/delete/etc defined by a view, name it here
 
 Unique Constraint List:
 
