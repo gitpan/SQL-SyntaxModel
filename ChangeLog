@@ -1,3 +1,23 @@
+2004-05-20   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.33.
+
+	* Updated Language.pod and SyntaxModel.pm (now v0.20) to remove all traces
+	of the 'view_context' enumerated value list, as well as the same-named
+	attribute in 'view' Nodes.  These were long known as redundant, and now they 
+	are gone.  References to 'view_context' were also purged from the test suite, 
+	and SyntaxModel.pm's SYNOPSIS.
+
+	* Split the existing SYNOPSIS in SyntaxModel.pm beneath 2 sub-headings
+	(head2), the first having the Perl code examples and the second having the
+	XML dump of a model.  Then added a largeish third sub-section which
+	demonstrates what actual SQL statements can be generated from parts of a
+	model, including multiple variants of CREATE and UPDATE statements.  I hope
+	that this will help ground my otherwise abstract documentation in reality,
+	making SQL::SyntaxModel easier to adopt for use.  This update was inspired
+	by Jarrell Dunson, who wrote me asking for examples of how to use
+	SQL::SyntaxModel.
+
 2004-05-19   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.32.

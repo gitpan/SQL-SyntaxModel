@@ -11,7 +11,7 @@ use 5.006;
 use strict;
 use warnings;
 use vars qw($VERSION);
-$VERSION = '0.19';
+$VERSION = '0.20';
 
 use Locale::KeyedText 0.03;
 
@@ -150,9 +150,6 @@ my %ENUMERATED_TYPES = (
 	) },
 	'table_index_type' => { map { ($_ => 1) } qw(
 		ATOMIC FULLTEXT UNIQUE FOREIGN UFOREIGN
-	) },
-	'view_context' => { map { ($_ => 1) } qw(
-		SCHEMA APPLIC ROUTINE INSIDE
 	) },
 	'view_type' => { map { ($_ => 1) } qw(
 		MATCH SINGLE MULTIPLE COMPOUND SUBQUERY RECURSIVE
@@ -524,7 +521,7 @@ my %NODE_TYPES = (
 	},
 	'view' => {
 		$TPI_AT_SEQUENCE => [qw( 
-			id view_context view_type schema name application routine p_view 
+			id view_type schema name application routine p_view 
 			match_all_cols c_merge_type may_write 
 		)],
 		$TPI_AT_LITERALS => {
@@ -533,7 +530,6 @@ my %NODE_TYPES = (
 			'may_write' => 'bool',
 		},
 		$TPI_AT_ENUMS => {
-			'view_context' => 'view_context',
 			'view_type' => 'view_type',
 			'c_merge_type' => 'compound_operator',
 		},
@@ -546,15 +542,9 @@ my %NODE_TYPES = (
 		$TPI_P_NODE_ATNMS => [qw( schema application routine p_view )],
 		$TPI_R_P_NODE_ATNM => 'p_view',
 		$TPI_MA_LITERALS => {map { ($_ => 1) } qw( name )},
-		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( view_context view_type )},
+		$TPI_MA_ENUMS => {map { ($_ => 1) } qw( view_type )},
 		$TPI_MCEE_ENUMS => {
 			'c_merge_type' => ['view_type', 'COMPOUND'],
-		},
-		$TPI_MCEE_NREFS => {
-			'schema' => ['view_context', 'SCHEMA'],
-			'application' => ['view_context', 'APPLIC'],
-			'routine' => ['view_context', 'ROUTINE'],
-			'p_view' => ['view_context', 'INSIDE'],
 		},
 	},
 	'view_arg' => {
@@ -2389,6 +2379,8 @@ __END__
 
 =head1 SYNOPSIS
 
+=head2 Model-Building Perl Code Examples
+
 This module's native API is highly verbose / detailed and so a realistically
 complete example of its use would be too large to show here.  (In fact, most
 real uses of the module would involve user-picked wrapper functions that aren't
@@ -2457,6 +2449,8 @@ in this module's test script/module: 't/SQL_SyntaxModel.t' and
 'lib/t_SQL_SyntaxModel.pm'.  Even that code is an incomplete sample, but it 
 also demonstrates the use of a couple simple wrapper functions.
 
+=head2 A Complete Example Model Serialized to XML
+
 This is a serialization of the model that the test code makes, which should
 give you a better idea what kind of information is stored in a SQL::SynaxModel:
 
@@ -2493,7 +2487,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 			<application id="2" name="People Watcher">
 				<catalog_link id="2" application="2" name="editor_link" target="1" />
 				<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-					<view id="2" view_context="ROUTINE" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
+					<view id="2" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
 						<view_src id="3" view="2" name="person" match_table="1" />
 					</view>
 					<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
@@ -2509,7 +2503,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					<routine_arg id="11" routine="9" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="12" routine="9" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="13" routine="9" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="14" view_context="ROUTINE" view_type="MATCH" name="insert_a_person" routine="9">
+					<view id="14" view_type="MATCH" name="insert_a_person" routine="9">
 						<view_src id="15" view="14" name="person" match_table="1">
 							<view_src_col id="16" src="15" match_table_col="1" />
 							<view_src_col id="17" src="15" match_table_col="2" />
@@ -2528,7 +2522,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 					<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
 					<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
 					<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-					<view id="30" view_context="ROUTINE" view_type="MATCH" name="update_a_person" routine="25">
+					<view id="30" view_type="MATCH" name="update_a_person" routine="25">
 						<view_src id="31" view="30" name="person" match_table="1">
 							<view_src_col id="32" src="31" match_table_col="1" />
 							<view_src_col id="33" src="31" match_table_col="2" />
@@ -2547,7 +2541,7 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 				</routine>
 				<routine id="43" routine_type="ANONYMOUS" application="2" name="delete_a_person">
 					<routine_arg id="44" routine="43" name="arg_person_id" var_type="SCALAR" domain="1" />
-					<view id="45" view_context="ROUTINE" view_type="MATCH" name="delete_a_person" routine="43">
+					<view id="45" view_type="MATCH" name="delete_a_person" routine="43">
 						<view_src id="46" view="45" name="person" match_table="1">
 							<view_src_col id="47" src="46" match_table_col="1" />
 						</view_src>
@@ -2593,6 +2587,155 @@ give you a better idea what kind of information is stored in a SQL::SynaxModel:
 For some additional code samples, try looking at the various modules that
 sub-class or use SQL::SyntaxModel.  They tend to implement or use wrappers that
 make for much more compact code.
+
+=head2 Comparative SQL Code Examples Generated From a Model
+
+SQL::SyntaxModel works like an XML DOM except that it is restricted to holding
+specific kinds of data, which resemble SQL statements.  This part of the
+SYNOPSIS shows some actual SQL statements that can be generated from selected
+portions of the above model.
+
+This first set of Nodes describes 2 domains and 1 table, all 3 of which are
+conceptually named schema objects.
+
+	<domain id="1" schema="1" name="entity_id" base_type="NUM_INT" num_precision="9" />
+	<domain id="2" schema="1" name="person_name" base_type="STR_CHAR" max_chars="100" char_enc="UTF8" />
+	<table id="1" schema="1" name="person">
+		<table_col id="1" table="1" name="person_id" domain="1" mandatory="1" default_val="1" auto_inc="1" />
+		<table_col id="2" table="1" name="name" domain="2" mandatory="1" />
+		<table_col id="3" table="1" name="father_id" domain="1" mandatory="0" />
+		<table_col id="4" table="1" name="mother_id" domain="1" mandatory="0" />
+		<table_ind id="1" table="1" name="primary" ind_type="UNIQUE">
+			<table_ind_col id="1" table_ind="1" table_col="1" />
+		</table_ind>
+		<table_ind id="2" table="1" name="fk_father" ind_type="FOREIGN" f_table="1">
+			<table_ind_col id="2" table_ind="2" table_col="3" f_table_col="1" />
+		</table_ind>
+		<table_ind id="3" table="1" name="fk_mother" ind_type="FOREIGN" f_table="1">
+			<table_ind_col id="3" table_ind="3" table_col="4" f_table_col="1" />
+		</table_ind>
+	</table>
+
+The above Node group has all the necessary details needed by external code to
+generate the following SQL statements.  There are two versions of SQL given for
+the same task; the first one is for SQL-2003 compliant databases, that support
+DOMAIN schema objects; the second example is for older databases that do not. 
+(Both of them use a MySQL extension AUTO_INCREMENT, but SQL generated for other
+databases would do the same thing in a different way.)
+
+	CREATE DOMAIN entity_id AS INTEGER(9);
+	CREATE DOMAIN person_name AS VARCHAR(100);
+	CREATE TABLE person (
+		person_id entity_id NOT NULL DEFAULT 1 AUTO_INCREMENT,
+		name person_name NOT NULL,
+		father_id entity_id NULL,
+		mother_id entity_id NULL,
+		CONSTRAINT PRIMARY KEY (person_id),
+		CONSTRAINT fk_father FOREIGN KEY (father_id) REFERENCES person (person_id),
+		CONSTRAINT fk_mother FOREIGN KEY (mother_id) REFERENCES person (person_id)
+	);
+
+	CREATE TABLE person (
+		person_id INTEGER(9) NOT NULL DEFAULT 1 AUTO_INCREMENT,
+		name VARCHAR(100) NOT NULL,
+		father_id INTEGER(9) NULL,
+		mother_id INTEGER(9) NULL,
+		CONSTRAINT PRIMARY KEY (person_id),
+		CONSTRAINT fk_father FOREIGN KEY (father_id) REFERENCES person (person_id),
+		CONSTRAINT fk_mother FOREIGN KEY (mother_id) REFERENCES person (person_id)
+	);
+
+Note that, regardless of which type of SQL is generated, the details for each
+data type, including its name, only need to be declared once, in 'domain'
+Nodes; if this one copy is changed, everything using it updates automatically.
+
+This second set of Nodes describes a routine that takes 4 arguments (each of
+which is an actual argument if a named stored procedure is generated, or a
+named bind variable if un-named client-side SQL is generated) and performs an
+UPDATE query against one table record; the query takes 4 arguments, using one
+to match a record and 3 as new record column values to set.
+
+	<routine id="25" routine_type="ANONYMOUS" application="2" name="update_a_person">
+		<routine_arg id="26" routine="25" name="arg_person_id" var_type="SCALAR" domain="1" />
+		<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
+		<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
+		<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
+		<view id="30" view_type="MATCH" name="update_a_person" routine="25">
+			<view_src id="31" view="30" name="person" match_table="1">
+				<view_src_col id="32" src="31" match_table_col="1" />
+				<view_src_col id="33" src="31" match_table_col="2" />
+				<view_src_col id="34" src="31" match_table_col="3" />
+				<view_src_col id="35" src="31" match_table_col="4" />
+			</view_src>
+			<view_expr id="36" expr_type="ARG" view="30" view_part="SET" set_view_col="33" routine_arg="27" />
+			<view_expr id="37" expr_type="ARG" view="30" view_part="SET" set_view_col="34" routine_arg="28" />
+			<view_expr id="38" expr_type="ARG" view="30" view_part="SET" set_view_col="35" routine_arg="29" />
+			<view_expr id="39" expr_type="SFUNC" view="30" view_part="WHERE" call_sfunc="EQ">
+				<view_expr id="40" expr_type="COL" p_expr="39" src_col="32" />
+				<view_expr id="41" expr_type="ARG" p_expr="39" routine_arg="26" />
+			</view_expr>
+		</view>
+		<routine_stmt id="42" routine="25" stmt_type="SPROC" call_sproc="UPDATE" view_for_dml="30" />
+	</routine>
+
+The above Node group, *together* with the previous Node group, has details to
+generate the following SQL statements.  There are two versions of SQL given for
+the same task; the first one is for databases that support named bind
+variables, illustrated using the Oracle style of ':foo'; the second one is for
+those that require positional bind variables, illustrated with the DBI style of
+'?'.  These two SQL variants are intended to be run by the SQL client.
+
+	UPDATE person
+	SET name = :arg_person_name, father_id = :arg_father_id, mother_id = :arg_mother_id
+	WHERE person_id = :arg_person_id;
+
+	UPDATE person
+	SET name = ?, father_id = ?, mother_id = ?
+	WHERE person_id = ?;
+
+Alternately, a stored procedure (and calls to it) can be generated from the
+same SSM Node set, if the routine_type attribute is PROCEDURE instead of
+ANONYMOUS.  The two SQL variants are for new or old databases respectively,
+like the first example.
+
+	CREATE PROCEDURE update_a_person
+	(arg_person_id entity_id, arg_person_name person_name, arg_father_id entity_id, arg_mother_id entity_id)
+	BEGIN
+		UPDATE person
+		SET name = arg_person_name, father_id = arg_father_id, mother_id = arg_mother_id
+		WHERE person_id = arg_person_id;
+	END;
+
+	CREATE PROCEDURE update_a_person
+	(arg_person_id INTEGER(9), arg_person_name VARCHAR(100), arg_father_id INTEGER(9), arg_mother_id INTEGER(9))
+	BEGIN
+		UPDATE person
+		SET name = arg_person_name, father_id = arg_father_id, mother_id = arg_mother_id
+		WHERE person_id = arg_person_id;
+	END;
+
+To go with those, here are SQL statements to invoke the server-side stored
+procedures, with the two variants being named-vs-positional bind variables.
+
+	CALL update_a_person (:arg_person_id, :arg_person_name, :arg_father_id, :arg_mother_id);
+
+	CALL update_a_person (?, ?, ?, ?);
+
+Finally, all DROP statements can be generated from the same Nodes as CREATE.
+
+Note that one key feature of SQL::SyntaxModel is that all of a model's pieces
+are linked by references rather than by name as in SQL itself.  So if you
+wanted to change the name of a table column, such as 'person_name' to
+'the_name', then you make the change in exactly one place and all SQL generated
+from the model will update, both the CREATE and UPDATE statements. Alternately,
+if you wanted to change the data type of person ids, then you only have to make
+a single change, such as by setting num_precision to 6.  Alternately, if you
+wanted to change the order of the arguments for 'update_a_person', you only
+have to change the order the 'routine_arg' Nodes appear, and any calls to the
+procedure will automatically re-order any passed values in the generated SQL.
+
+I<See also the separately distributed Rosetta::Utility::SQLBuilder module,
+which is a reference implementation of a SQL generator for SQL::SyntaxModel.>
 
 =head1 DESCRIPTION
 
@@ -3600,8 +3743,9 @@ regardless); as of v0.13 I did away with the cludge.>
 =head1 SEE ALSO
 
 perl(1), SQL::SyntaxModel::L::*, SQL::SyntaxModel::Language,
-SQL::SyntaxModel::API_C, SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID,
-Rosetta, Rosetta::Framework, DBI, SQL::Statement, SQL::Translator, SQL::YASP,
+SQL::SyntaxModel::API_C, Rosetta::Utility::SQLBuilder,
+SQL::SyntaxModel::ByTree, SQL::SyntaxModel::SkipID, Rosetta,
+Rosetta::Framework, DBI, SQL::Statement, SQL::Translator, SQL::YASP,
 SQL::Generator, SQL::Schema, SQL::Abstract, SQL::Snippet, SQL::Catalog,
 DB::Ent, DBIx::Abstract, DBIx::AnyDBD, DBIx::DBSchema, DBIx::Namespace,
 DBIx::SearchBuilder, TripleStore, and various other modules.

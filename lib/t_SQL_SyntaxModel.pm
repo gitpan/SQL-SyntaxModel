@@ -157,7 +157,6 @@ sub create_and_populate_model {
 	$rt_fetchall->set_literal_attribute( 'name', 'fetch_all_persons' );
 	$rt_fetchall->set_enumerated_attribute( 'return_var_type', 'CURSOR' );
 	my $vw_fetchall = make_a_child_node( 'view', 2, $rt_fetchall, 'routine' );
-	$vw_fetchall->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_fetchall->set_enumerated_attribute( 'view_type', 'MATCH' );
 	$vw_fetchall->set_literal_attribute( 'name', 'fetch_all_persons' );
 	$vw_fetchall->set_literal_attribute( 'match_all_cols', 1 );
@@ -203,7 +202,6 @@ sub create_and_populate_model {
 	$rta_ins_mid->set_enumerated_attribute( 'var_type', 'SCALAR' );
 	$rta_ins_mid->set_node_ref_attribute( 'domain', $dom_entity_id );
 	my $vw_insertone = make_a_child_node( 'view', 14, $rt_insertone, 'routine' );
-	$vw_insertone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_insertone->set_enumerated_attribute( 'view_type', 'MATCH' );
 	$vw_insertone->set_literal_attribute( 'name', 'insert_a_person' );
 	my $vws_ins_pers = make_a_child_node( 'view_src', 15, $vw_insertone, 'view' );
@@ -264,7 +262,6 @@ sub create_and_populate_model {
 	$rta_upd_mid->set_enumerated_attribute( 'var_type', 'SCALAR' );
 	$rta_upd_mid->set_node_ref_attribute( 'domain', $dom_entity_id );
 	my $vw_updateone = make_a_child_node( 'view', 30, $rt_updateone, 'routine' );
-	$vw_updateone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_updateone->set_enumerated_attribute( 'view_type', 'MATCH' );
 	$vw_updateone->set_literal_attribute( 'name', 'update_a_person' );
 	my $vws_upd_pers = make_a_child_node( 'view_src', 31, $vw_updateone, 'view' );
@@ -318,7 +315,6 @@ sub create_and_populate_model {
 	$rta_del_pid->set_enumerated_attribute( 'var_type', 'SCALAR' );
 	$rta_del_pid->set_node_ref_attribute( 'domain', $dom_entity_id );
 	my $vw_deleteone = make_a_child_node( 'view', 45, $rt_deleteone, 'routine' );
-	$vw_deleteone->set_enumerated_attribute( 'view_context', 'ROUTINE' );
 	$vw_deleteone->set_enumerated_attribute( 'view_type', 'MATCH' );
 	$vw_deleteone->set_literal_attribute( 'name', 'delete_a_person' );
 	my $vws_del_pers = make_a_child_node( 'view_src', 46, $vw_deleteone, 'view' );
@@ -489,7 +485,7 @@ sub expected_model_xml_output {
 		<application id="2" name="People Watcher">
 			<catalog_link id="2" application="2" name="editor_link" target="1" />
 			<routine id="1" routine_type="ANONYMOUS" application="2" name="fetch_all_persons" return_var_type="CURSOR">
-				<view id="2" view_context="ROUTINE" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
+				<view id="2" view_type="MATCH" name="fetch_all_persons" routine="1" match_all_cols="1">
 					<view_src id="3" view="2" name="person" match_table="1" />
 				</view>
 				<routine_var id="4" routine="1" name="person_cursor" var_type="CURSOR" curs_view="2" />
@@ -505,7 +501,7 @@ sub expected_model_xml_output {
 				<routine_arg id="11" routine="9" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="12" routine="9" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="13" routine="9" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="14" view_context="ROUTINE" view_type="MATCH" name="insert_a_person" routine="9">
+				<view id="14" view_type="MATCH" name="insert_a_person" routine="9">
 					<view_src id="15" view="14" name="person" match_table="1">
 						<view_src_col id="16" src="15" match_table_col="1" />
 						<view_src_col id="17" src="15" match_table_col="2" />
@@ -524,7 +520,7 @@ sub expected_model_xml_output {
 				<routine_arg id="27" routine="25" name="arg_person_name" var_type="SCALAR" domain="2" />
 				<routine_arg id="28" routine="25" name="arg_father_id" var_type="SCALAR" domain="1" />
 				<routine_arg id="29" routine="25" name="arg_mother_id" var_type="SCALAR" domain="1" />
-				<view id="30" view_context="ROUTINE" view_type="MATCH" name="update_a_person" routine="25">
+				<view id="30" view_type="MATCH" name="update_a_person" routine="25">
 					<view_src id="31" view="30" name="person" match_table="1">
 						<view_src_col id="32" src="31" match_table_col="1" />
 						<view_src_col id="33" src="31" match_table_col="2" />
@@ -543,7 +539,7 @@ sub expected_model_xml_output {
 			</routine>
 			<routine id="43" routine_type="ANONYMOUS" application="2" name="delete_a_person">
 				<routine_arg id="44" routine="43" name="arg_person_id" var_type="SCALAR" domain="1" />
-				<view id="45" view_context="ROUTINE" view_type="MATCH" name="delete_a_person" routine="43">
+				<view id="45" view_type="MATCH" name="delete_a_person" routine="43">
 					<view_src id="46" view="45" name="person" match_table="1">
 						<view_src_col id="47" src="46" match_table_col="1" />
 					</view_src>
@@ -602,18 +598,15 @@ sub test_circular_ref_prevention {
 	$schema->set_node_ref_attribute( 'owner', $owner );
 
 	my $vw1 = make_a_child_node( 'view', 1, $schema, 'schema' );
-	$vw1->set_enumerated_attribute( 'view_context', 'SCHEMA' );
 	$vw1->set_enumerated_attribute( 'view_type', 'COMPOUND' );
 	$vw1->set_literal_attribute( 'name', 'foo' );
 	$vw1->set_enumerated_attribute( 'c_merge_type', 'UNION' );
 
 	my $vw2 = make_a_child_node( 'view', 2, $vw1, 'p_view' );
-	$vw2->set_enumerated_attribute( 'view_context', 'INSIDE' );
 	$vw2->set_enumerated_attribute( 'view_type', 'SINGLE' );
 	$vw2->set_literal_attribute( 'name', 'bar' );
 
 	my $vw3 = make_a_child_node( 'view', 3, $vw2, 'p_view' );
-	$vw3->set_enumerated_attribute( 'view_context', 'INSIDE' );
 	$vw3->set_enumerated_attribute( 'view_type', 'SINGLE' );
 	$vw3->set_literal_attribute( 'name', 'bz' );
 

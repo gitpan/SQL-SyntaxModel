@@ -646,23 +646,6 @@ constraints on what data can be put in the columns.
 	set up, such as a customizable stopword list; that will be added later.
 	Note that the UFOREIGN type is interchangeable with UNIQUE+FOREIGN for same table cols.
 
-=head2 view_context
-
-These are the basic context types that a database view or SQL query can be
-declared in.  This enumeration may not actually be necessary (redundant with
-the fact that a Node's primary parent is known), but rather this is a
-convenience.
-
-	SCHEMA - a named schema object, the classic "view"; its parent must be a schema, not a view
-	APPLIC - an un-named select query that is declared at application level; p is app, not routine
-	ROUTINE - a select cursor declared inside a routine (db or app); its parent must be a routine or routine_var
-	INSIDE - a subquery, named or not, inside another view
-
-Both SCHEMA and APPLIC views (and INSIDE children) may not use any variables
-(except 'with' for children).  Any views with variables must be declared within
-routines (even if only their child INSIDE have them), either database or
-application level; the variables are provided via the routines.
-
 =head2 view_type
 
 These are the basic types that a database view or SQL query can be.  All types 
@@ -1704,13 +1687,12 @@ to the rows being changed.
 Attribute List:
 
 	id - NODE_ID - MA - unique identifier for each Node within this Node Type
-	view_context - E.view_context - MA - what context this view expects to live in; eg: schema, cursor, application
 	view_type - E.view_type - MA - what kind of view this is; eg: match, single, mult, compound, has-subq, recursive
-	schema - N.schema - PP - MCEE(view_context=SCHEMA) - the schema that this view is in, if any
+	schema - N.schema - PP - the schema that this view is in, if any
 	name - L.cstr - MA - the name this view is identified by, if any
-	application - PP - N.application - MCEE(view_context=APPLIC) - if view in app space, not app routine, an app is our parent
-	routine - PP - N.routine - MCEE(view_context=ROUTINE) - parent view of this one, if any; empty if this is the root view
-	p_view - PP - N.view - MCEE(view_context=INSIDE) - parent view of this one, if any; empty if this is the root view
+	application - N.application - PP - if view in app space, not app routine, an app is our parent
+	routine - N.routine - PP - parent view of this one, if any; empty if this is the root view
+	p_view - N.view - PP - parent view of this one, if any; empty if this is the root view
 	match_all_cols - L.bool - use with view_type=MATCH; if true, this view matches every col; if false, view_col has list
 	c_merge_type - E.compound_operator - MCEE(view_type=COMPOUND) - how to merge any child rowsets/views of this one together, if any
 	may_write - L.bool - true when we should at least try allowing updates through the view
@@ -1722,15 +1704,15 @@ Unique Constraint List:
 
 Example List:
 
-	|id|context|type    |ac|
-	|--|-------|--------|--|
-	| 1|SCHEMA |MULTIPLE|  | - user - joins the "user_auth" and "user_profile" tables
-	| 2|SCHEMA |MULTIPLE|  | - person_with_parents - joins the "person" table with itself twice
-	| 3|APPLIC |SINGLE  |  | - user_theme - shows how many users use each theme pref value
-	| 4|ROUTINE|MATCH   | 1| - get_person - simply the "person" table
-	| 5|ROUTINE|MATCH   | 1| - get_user - simply the "user" view
-	| 6|ROUTINE|MATCH   | 1| - get_pwp - simply the "person_with_parents" view
-	| 7|ROUTINE|MATCH   | 1| - get_theme - simply the "user_theme" view
+	|id|type    |ac|
+	|--|--------|--|
+	| 1|MULTIPLE|  | - user - joins the "user_auth" and "user_profile" tables
+	| 2|MULTIPLE|  | - person_with_parents - joins the "person" table with itself twice
+	| 3|SINGLE  |  | - user_theme - shows how many users use each theme pref value
+	| 4|MATCH   | 1| - get_person - simply the "person" table
+	| 5|MATCH   | 1| - get_user - simply the "user" view
+	| 6|MATCH   | 1| - get_pwp - simply the "person_with_parents" view
+	| 7|MATCH   | 1| - get_theme - simply the "user_theme" view
 
 =head2 view_arg
 
